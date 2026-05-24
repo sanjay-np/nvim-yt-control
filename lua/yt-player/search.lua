@@ -1042,12 +1042,12 @@ function M.interactive_picker(initial_query)
 	end, opts)
 
 	-- First/last
-	vim.keymap.set("n", "g", function()
-		jump_to_index(#results)
-	end, opts) -- last
-	vim.keymap.set("n", "G", function()
+	vim.keymap.set("n", "gg", function()
 		jump_to_index(1)
 	end, opts) -- first
+	vim.keymap.set("n", "G", function()
+		jump_to_index(#results)
+	end, opts) -- last
 
 	-- Alternative navigation in insert mode
 	vim.keymap.set("i", "<C-j>", function()

@@ -17,6 +17,10 @@ function M._register()
 				if args and args ~= "" then
 					yt().load(args)
 				else
+					if not require("yt-player.mpv").is_running() then
+						vim.notify("YT Control: mpv is not running. Play a track/URL first.", vim.log.levels.WARN)
+						return
+					end
 					yt().command({ "set_property", "pause", false })
 				end
 			end,
@@ -28,36 +32,42 @@ function M._register()
 				yt().command({ "set_property", "pause", true })
 			end,
 			desc = "Pause playback",
+			require_running = true,
 		},
 		toggle = {
 			impl = function()
 				yt().command({ "cycle", "pause" })
 			end,
 			desc = "Toggle play/pause",
+			require_running = true,
 		},
 		stop = {
 			impl = function()
 				yt().command({ "stop" })
 			end,
 			desc = "Stop playback",
+			require_running = true,
 		},
 		next = {
 			impl = function()
 				yt().command({ "playlist-next", "weak" })
 			end,
 			desc = "Next track",
+			require_running = true,
 		},
 		prev = {
 			impl = function()
 				yt().command({ "playlist-prev", "weak" })
 			end,
 			desc = "Previous track",
+			require_running = true,
 		},
 		mute = {
 			impl = function()
 				yt().command({ "cycle", "mute" })
 			end,
 			desc = "Toggle mute",
+			require_running = true,
 		},
 		seek = {
 			impl = function(args)
@@ -70,6 +80,7 @@ function M._register()
 			end,
 			desc = "Seek to position (seconds)",
 			nargs = 1,
+			require_running = true,
 		},
 		seek_rel = {
 			impl = function(args)
@@ -82,6 +93,7 @@ function M._register()
 			end,
 			desc = "Seek relative (+/- seconds)",
 			nargs = 1,
+			require_running = true,
 		},
 		volume = {
 			impl = function(args)
@@ -94,18 +106,21 @@ function M._register()
 			end,
 			desc = "Set volume (0-100)",
 			nargs = 1,
+			require_running = true,
 		},
 		vol_up = {
 			impl = function()
 				yt().command({ "add", "volume", 5 })
 			end,
 			desc = "Volume +5",
+			require_running = true,
 		},
 		vol_down = {
 			impl = function()
 				yt().command({ "add", "volume", -5 })
 			end,
 			desc = "Volume -5",
+			require_running = true,
 		},
 		speed = {
 			impl = function(args)
@@ -148,12 +163,14 @@ function M._register()
 			end,
 			desc = "Set/adjust speed: <N> | up | down | +N | -N",
 			nargs = "?",
+			require_running = true,
 		},
 		shuffle = {
 			impl = function()
 				yt().command({ "playlist-shuffle" })
 			end,
 			desc = "Shuffle playlist",
+			require_running = true,
 		},
 		repeat_toggle = {
 			impl = function()
@@ -168,17 +185,19 @@ function M._register()
 				end
 			end,
 			desc = "Toggle repeat playlist",
+			require_running = true,
 		},
 		player = {
-			impl = function(args)
-				if vim.trim(args or "") == "float" then
-					require("yt-player.player").toggle_float()
-				else
-					require("yt-player.player").toggle_panel()
-				end
+			impl = function()
+				require("yt-player.player").toggle_panel()
 			end,
-			desc = "Toggle player panel; use 'float' arg for floating window",
-			nargs = "?",
+			desc = "Toggle player side-panel",
+		},
+		mini = {
+			impl = function()
+				require("yt-player.player").toggle_float()
+			end,
+			desc = "Toggle floating player window",
 		},
 		search = {
 			impl = function(args)
@@ -245,11 +264,11 @@ function M._register()
 			end,
 			desc = "Manage local playlists",
 		},
-		radio = {
+		resume = {
 			impl = function()
-				require("yt-player.radio").toggle()
+				require("yt-player.session").restore()
 			end,
-			desc = "Toggle radio/autoplay mode",
+			desc = "Resume last playback session",
 		},
 	}
 
@@ -269,6 +288,11 @@ function M._register()
 		local subcmd = subcommands[subcmd_name]
 		if not subcmd then
 			vim.notify("YT Control: Unknown command '" .. subcmd_name .. "'", vim.log.levels.ERROR)
+			return
+		end
+
+		if subcmd.require_running and not require("yt-player.mpv").is_running() then
+			vim.notify("YT Control: mpv is not running. Play a track/URL first.", vim.log.levels.WARN)
 			return
 		end
 

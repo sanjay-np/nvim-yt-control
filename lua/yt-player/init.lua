@@ -67,6 +67,9 @@ function M.setup(opts)
 		group = vim.api.nvim_create_augroup("YTControlCleanup", { clear = true }),
 		callback = function()
 			pcall(function()
+				require("yt-player.session").save()
+			end)
+			pcall(function()
 				M.mpv.shutdown()
 			end)
 		end,

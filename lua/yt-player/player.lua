@@ -4,8 +4,7 @@ local M = {}
 M.panel = { win_id = nil, buf_id = nil, update_timer = nil }
 M.float = { win_id = nil, buf_id = nil, update_timer = nil }
 
--- Mode state: nil = normal, true = minimal
-M.minimal_mode = nil
+
 
 -- Highlights setup flag
 M.highlights_setup = false
@@ -216,7 +215,6 @@ end
 local function build_lines(state, is_float)
 	local is_playing = state.playing
 	local width = get_target_width(is_float)
-	local use_minimal = M.minimal_mode
 	local content_width = width - 4
 
 	-- Animate visualizer if playing
@@ -243,135 +241,160 @@ local function build_lines(state, is_float)
 	local lines = {}
 	local highlights = {} -- Store highlights for each line
 
+	-- Helper to apply precise border highlighting (only highlights content inside boundaries)
+	local function add_row_highlights(line_idx, highlight, padded_len)
+		-- Left border (3-byte UTF-8 │ plus 1 space = 4 bytes)
+		table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 0, col_end = 3 })
+		-- Content
+		if highlight then
+			table.insert(highlights, { line = line_idx, hl = highlight, col_start = 4, col_end = 4 + padded_len })
+		end
+		-- Right border (1 space plus 3-byte UTF-8 │)
+		table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 4 + padded_len + 1, col_end = -1 })
+	end
+
 	-- Helper to add bordered row with optional highlight
 	local function add_row(content, highlight)
-		table.insert(lines, string.format("│ %s │", pad_right(content, content_width)))
-		if highlight and M.config.colors then
-			table.insert(highlights, { line = #lines - 1, hl = highlight })
+		local padded = pad_right(content, content_width)
+		table.insert(lines, string.format("│ %s │", padded))
+		if M.config.colors then
+			add_row_highlights(#lines - 1, highlight, #padded)
 		end
 	end
+
 	local function add_center(content, highlight)
-		table.insert(lines, string.format("│ %s │", center_text(content, content_width)))
-		if highlight and M.config.colors then
-			table.insert(highlights, { line = #lines - 1, hl = highlight })
+		local padded = center_text(content, content_width)
+		table.insert(lines, string.format("│ %s │", padded))
+		if M.config.colors then
+			add_row_highlights(#lines - 1, highlight, #padded)
+		end
+	end
+
+	-- Helper to add a header/footer/section-header border-only line
+	local function add_border_line(border_str)
+		table.insert(lines, border_str)
+		if M.config.colors then
+			table.insert(highlights, { line = #lines - 1, hl = "YtPlayerBorder", col_start = 0, col_end = -1 })
+		end
+	end
+
+	-- Calculate split: album art + track info
+	local art_width = 7
+	local info_width = content_width - art_width - 1
+
+	-- Helper to add album art + track info row with clean borders
+	local function add_art_row(art_line, info_line, hl)
+		local padded_info = pad_right(info_line, info_width)
+		table.insert(lines, string.format("│ %s %s │", art_line, padded_info))
+		if M.config.colors then
+			local line_idx = #lines - 1
+			-- Left border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 0, col_end = 3 })
+			-- Album Art
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerArtist", col_start = 4, col_end = 11 })
+			-- Track info
+			if hl then
+				table.insert(highlights, { line = line_idx, hl = hl, col_start = 12, col_end = 12 + #padded_info })
+			end
+			-- Right border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 12 + #padded_info + 1, col_end = -1 })
 		end
 	end
 
 	-- ╭─ Header ───────────────────────╮
 	-- LAYER 1: Track title + artist - PROMINENT
-	if use_minimal then
-		-- Minimal: title + mini progress on one line
-		local mini_prog = mini_progress_bar(state.position, state.duration, width - 25)
-		table.insert(lines, get_cached_header("Now Playing", width))
-		add_row(string.format("♫ %s %s %s", utils.safe_truncate(title, width - 30), mini_prog, pct), "YtPlayerTitle")
-	else
-		-- Normal: Full visual hierarchy
-		table.insert(lines, get_cached_header("Now Playing", width))
+	-- Normal: Full visual hierarchy
+	add_border_line(get_cached_header("Now Playing", width))
 
-		-- Album Art Placeholder (left side) + Track Info (right side)
-		-- All lines must be exactly 7 chars for proper alignment
-		local album_art = {
-			"[~~~~~]",
-			"[Album]",
-			"[ Art ]",
-			"-------",
-		}
+	-- Album Art Placeholder (left side) + Track Info (right side)
+	-- All lines must be exactly 7 chars for proper alignment
+	local album_art = {
+		"[~~~~~]",
+		"[Album]",
+		"[ Art ]",
+		"-------",
+	}
 
-		-- Calculate split: album art + track info
-		local art_width = 7
-		local info_width = content_width - art_width - 1
-
-		-- Add album art + track info row
-		for i, art_line in ipairs(album_art) do
-			local info_line = ""
-			local hl = nil
-			if i == 1 then
-				info_line = utils.safe_truncate(title, info_width)
-				hl = "YtPlayerTitle"
-			elseif i == 2 then
-				info_line = utils.safe_truncate(artist, info_width)
-				hl = "YtPlayerArtist"
-			elseif i == 3 then
-				-- Duration info
-				info_line = string.format("⏱ %s / %s", pos_str, dur_str)
-			elseif i == 4 then
-				-- View count / playlist info if available
-				if state.view_count then
-					info_line = string.format("👁 %s views", state.view_count)
-				elseif state.playlist_name then
-					info_line = "📋 " .. utils.safe_truncate(state.playlist_name, info_width - 2)
-				else
-					info_line = ""
-				end
+	-- Add album art + track info row
+	for i, art_line in ipairs(album_art) do
+		local info_line = ""
+		local hl = nil
+		if i == 1 then
+			info_line = utils.safe_truncate(title, info_width)
+			hl = "YtPlayerTitle"
+		elseif i == 2 then
+			info_line = utils.safe_truncate(artist, info_width)
+			hl = "YtPlayerArtist"
+		elseif i == 3 then
+			-- Duration info
+			info_line = string.format("⏱ %s / %s", pos_str, dur_str)
+		elseif i == 4 then
+			-- View count / playlist info if available
+			if state.view_count then
+				info_line = string.format("👁 %s views", state.view_count)
+			elseif state.playlist_name then
+				info_line = "📋 " .. utils.safe_truncate(state.playlist_name, info_width - 2)
 			else
 				info_line = ""
 			end
-			table.insert(lines, string.format("│ %s %s │", art_line, pad_right(info_line, info_width)))
-			if hl and M.config.colors then
-				table.insert(highlights, { line = #lines - 1, hl = hl })
-			end
+		else
+			info_line = ""
 		end
+		add_art_row(art_line, info_line, hl)
+	end
 
-		-- Visualizer
-		if M.config.show_visualizer then
-			add_center("▃▅▆  " .. vis .. "  ▆▅▃", "YtPlayerProgress")
-		end
+	-- Visualizer
+	if M.config.show_visualizer then
+		add_center("▃▅▆  " .. vis .. "  ▆▅▃", "YtPlayerProgress")
+	end
 
-		-- Layer 2: Playback status + progress
-		local prog_bar = progress_bar(state.position, state.duration, width - 22)
-		local prog_line = string.format("%s %s %s", pos_str, prog_bar, dur_str)
-		add_row(prog_line, "YtPlayerProgress")
+	-- Layer 2: Playback status + progress
+	local prog_bar = progress_bar(state.position, state.duration, width - 22)
+	local prog_line = string.format("%s %s %s", pos_str, prog_bar, dur_str)
+	add_row(prog_line, "YtPlayerProgress")
 
-		-- Layer 3: Volume + Speed (secondary info)
-		local vol_icon = (state.muted or vol == 0) and "🔇" or (vol > 50 and "🔊" or "🔉")
-		local vol_line = string.format("%s %d%%  ⏩ %s", vol_icon, vol, speed_str)
-		add_row(vol_line, "YtPlayerVolume")
+	-- Layer 3: Volume + Speed (secondary info)
+	local vol_icon = (state.muted or vol == 0) and "🔇" or (vol > 50 and "🔊" or "🔉")
+	local vol_line = string.format("%s %d%%  ⏩ %s", vol_icon, vol, speed_str)
+	add_row(vol_line, "YtPlayerVolume")
 
-		-- Controls: compact icons
-		local ctrl_icon = is_playing and "⏸" or "▶"
-		local ctrl = string.format("⏮ │ %s │ ⏭    %s │ 🔀", ctrl_icon, vol_icon)
-		add_center(ctrl, "YtPlayerControls")
+	-- Controls: compact icons
+	local ctrl_icon = is_playing and "⏸" or "▶"
+	local ctrl = string.format("⏮ │ %s │ ⏭    %s │ 🔀", ctrl_icon, vol_icon)
+	add_center(ctrl, "YtPlayerControls")
 
-		-- Loop / Radio mode indicator
-		local radio_on = pcall(function()
-			return require("yt-player.radio").enabled
-		end) and require("yt-player.radio").enabled
+	-- Loop indicator
+	local mode_str = ""
+	local mode_hl = ""
+	if state.loop_file and state.loop_file ~= "no" and state.loop_file ~= false then
+		mode_str = "🔂 Loop: Track"
+		mode_hl = "YtPlayerRadio"
+	elseif state.loop_playlist and state.loop_playlist ~= "no" and state.loop_playlist ~= false then
+		mode_str = "🔁 Loop: Playlist"
+		mode_hl = "YtPlayerRadio"
+	end
 
-		local mode_str = ""
-		local mode_hl = ""
-		if state.loop_file and state.loop_file ~= "no" and state.loop_file ~= false then
-			mode_str = "🔂 Loop: Track"
-			mode_hl = "YtPlayerRadio"
-		elseif state.loop_playlist and state.loop_playlist ~= "no" and state.loop_playlist ~= false then
-			mode_str = "🔁 Loop: Playlist"
-			mode_hl = "YtPlayerRadio"
-		elseif radio_on then
-			mode_str = "📻 Radio Mode"
-			mode_hl = "YtPlayerRadio"
-		end
-
-		if mode_str ~= "" then
-			add_center(mode_str, mode_hl)
-		end
+	if mode_str ~= "" then
+		add_center(mode_str, mode_hl)
 	end
 
 	-- Footer
-	table.insert(lines, get_cached_footer(width))
+	add_border_line(get_cached_footer(width))
 
 	-- Layer 4: Help section - reduced to 1 line (conditional)
-	if not use_minimal and M.config.show_help then
-		table.insert(lines, get_cached_section_header("Controls", width))
-		add_row("[p/s/t]Play [b/n]Nav [m]Vol [</>]Speed [0-9]Seek [r]Radio [M]Mini [q]Exit", "YtPlayerHelp")
-		table.insert(lines, get_cached_footer(width))
+	if M.config.show_help then
+		add_border_line(get_cached_section_header("Controls", width))
+		add_row("[p/s/t]Play [b/n]Nav [m]Vol [</>]Speed [0-9]Seek [q]Exit", "YtPlayerHelp")
+		add_border_line(get_cached_footer(width))
 	end
 
 	-- Compact Queue with duration (conditional)
 	if M.config.show_queue and state.playlist and #state.playlist > 0 then
 		local count_txt = string.format("%d/%d", (state.playlist_pos or 0) + 1, #state.playlist)
 
-		table.insert(lines, get_cached_section_header("Queue (" .. count_txt .. ")", width))
+		add_border_line(get_cached_section_header("Queue (" .. count_txt .. ")", width))
 
-		local limit = use_minimal and 3 or M.config.queue_limit
+		local limit = M.config.queue_limit
 		local start_idx = math.max(1, (state.playlist_pos or 0))
 		local end_idx = math.min(#state.playlist, start_idx + limit - 1)
 
@@ -404,14 +427,14 @@ local function build_lines(state, is_float)
 
 			-- Visual separator after current track
 			if is_current and i < end_idx then
-				add_row(pad_right("├" .. string.rep("─", content_width - 1), content_width), "YtPlayerBorder")
+				add_row(string.rep("─", content_width), "YtPlayerBorder")
 			end
 		end
 
 		if end_idx < #state.playlist then
-			add_row(string.format("│ +%d more", #state.playlist - end_idx))
+			add_row(string.format("+%d more", #state.playlist - end_idx))
 		end
-		table.insert(lines, get_cached_footer(width))
+		add_border_line(get_cached_footer(width))
 	end
 
 	return lines, highlights
@@ -455,7 +478,9 @@ local function refresh_instance(inst, is_float)
 	if highlights and #highlights > 0 then
 		vim.api.nvim_buf_clear_namespace(inst.buf_id, ns_id, 0, -1)
 		for _, hl_info in ipairs(highlights) do
-			pcall(vim.api.nvim_buf_add_highlight, inst.buf_id, ns_id, hl_info.hl, hl_info.line, 0, -1)
+			local col_start = hl_info.col_start or 0
+			local col_end = hl_info.col_end or -1
+			pcall(vim.api.nvim_buf_add_highlight, inst.buf_id, ns_id, hl_info.hl, hl_info.line, col_start, col_end)
 		end
 	end
 
@@ -538,15 +563,8 @@ local function setup_keymaps(buf, is_float)
 		vim.defer_fn(refresh, 200)
 	end, o)
 
-	vim.keymap.set("n", "r", function()
-		require("yt-player.radio").toggle()
-		refresh()
-	end, o)
-	-- Toggle minimal mode
-	vim.keymap.set("n", "M", function()
-		M.minimal_mode = not M.minimal_mode
-		refresh()
-	end, o)
+
+
 end
 
 ---------- PANEL ----------
@@ -570,7 +588,9 @@ function M.open_panel()
 
 	if highlights and #highlights > 0 then
 		for _, hl_info in ipairs(highlights) do
-			pcall(vim.api.nvim_buf_add_highlight, M.panel.buf_id, ns_id, hl_info.hl, hl_info.line, 0, -1)
+			local col_start = hl_info.col_start or 0
+			local col_end = hl_info.col_end or -1
+			pcall(vim.api.nvim_buf_add_highlight, M.panel.buf_id, ns_id, hl_info.hl, hl_info.line, col_start, col_end)
 		end
 	end
 	M.panel.last_hash = table.concat(lines, "\n")
@@ -663,7 +683,9 @@ function M.open_float()
 
 	if highlights and #highlights > 0 then
 		for _, hl_info in ipairs(highlights) do
-			pcall(vim.api.nvim_buf_add_highlight, M.float.buf_id, ns_id, hl_info.hl, hl_info.line, 0, -1)
+			local col_start = hl_info.col_start or 0
+			local col_end = hl_info.col_end or -1
+			pcall(vim.api.nvim_buf_add_highlight, M.float.buf_id, ns_id, hl_info.hl, hl_info.line, col_start, col_end)
 		end
 	end
 	M.float.last_hash = table.concat(lines, "\n")
@@ -684,6 +706,14 @@ function M.open_float()
 	})
 
 	vim.wo[M.float.win_id].cursorline = false
+	vim.wo[M.float.win_id].number = false
+	vim.wo[M.float.win_id].relativenumber = false
+	vim.wo[M.float.win_id].signcolumn = "no"
+	vim.wo[M.float.win_id].foldcolumn = "0"
+	vim.wo[M.float.win_id].wrap = false
+	if vim.fn.has("nvim-0.9") == 1 then
+		vim.wo[M.float.win_id].statuscolumn = ""
+	end
 
 	setup_keymaps(M.float.buf_id, true)
 
@@ -731,21 +761,6 @@ function M.toggle_float()
 	end
 end
 
--- Toggle minimal mode (press M in player)
-function M.toggle_minimal()
-	M.minimal_mode = not M.minimal_mode
-	if M.panel.win_id and vim.api.nvim_win_is_valid(M.panel.win_id) then
-		refresh_panel()
-	end
-	if M.float.win_id and vim.api.nvim_win_is_valid(M.float.win_id) then
-		refresh_float()
-	end
-	return M.minimal_mode
-end
 
--- Check if minimal mode is active
-function M.is_minimal()
-	return M.minimal_mode == true
-end
 
 return M

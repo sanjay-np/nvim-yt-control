@@ -11,6 +11,7 @@ M.ipc_connected = false
 M.ipc_socket_path = vim.fn.stdpath("cache") .. "/nvim-yt-player/ipc.sock"
 M.client_registry_path = vim.fn.stdpath("cache") .. "/nvim-yt-player/clients.json"
 M.is_external_client = false
+M.current_url = ""
 
 M.shutting_down = false
 
@@ -488,7 +489,7 @@ function M._handle_ipc_message(line)
 			pcall(function()
 				require("yt-player.history").add({
 					title = prop_data,
-					url = require("yt-player.radio").last_url or "",
+					url = M.current_url or "",
 					duration = current.duration or 0,
 				})
 			end)
@@ -496,15 +497,6 @@ function M._handle_ipc_message(line)
 	elseif msg.event == "end-file" then
 		if msg.reason ~= "stop" and msg.reason ~= "quit" then
 			state_mod.update({ playing = false, position = 0, title = "Finished" })
-
-			-- Trigger radio autoplay if playlist is exhausted
-			local current = state_mod.get_current()
-			local at_end = (current.playlist_pos or 0) >= (#(current.playlist or {}) - 1)
-			if at_end then
-				pcall(function()
-					require("yt-player.radio").on_queue_end()
-				end)
-			end
 		end
 	end
 end
@@ -557,10 +549,8 @@ function M.load_url(url)
 		return false
 	end
 
-	-- Track URL for radio recommendations and loop-prevention history
-	pcall(function()
-		require("yt-player.radio").set_current_url(url)
-	end)
+	-- Track URL for history logging
+	M.current_url = url
 
 	if not M.is_running() then
 		M.start(url)

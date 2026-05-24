@@ -6,6 +6,10 @@ M.config = {}
 local state_mod = require("yt-player.state")
 local utils = require("yt-player.utils")
 
+local function escape_gsub(str)
+	return (tostring(str or ""):gsub("%%", "%%%%"))
+end
+
 -- Cache
 local cached_line = nil
 local cached_hash = nil
@@ -66,15 +70,15 @@ function M.get_statusline()
 	local speed = (state.speed and state.speed ~= 1) and string.format("%.2gx", state.speed) or ""
 
 	local result = M.config.format
-		:gsub("{icon}", icon)
-		:gsub("{title}", title)
-		:gsub("{artist}", state.artist or "")
-		:gsub("{album}", state.album or "")
-		:gsub("{position}", utils.format_time(state.position))
-		:gsub("{duration}", utils.format_time(state.duration))
-		:gsub("{volume}", tostring(math.floor(state.volume or 100)))
-		:gsub("{progress}", progress_bar(state.position, state.duration, M.config.progress_width))
-		:gsub("{speed}", speed)
+		:gsub("{icon}", escape_gsub(icon))
+		:gsub("{title}", escape_gsub(title))
+		:gsub("{artist}", escape_gsub(state.artist or ""))
+		:gsub("{album}", escape_gsub(state.album or ""))
+		:gsub("{position}", escape_gsub(utils.format_time(state.position)))
+		:gsub("{duration}", escape_gsub(utils.format_time(state.duration)))
+		:gsub("{volume}", escape_gsub(tostring(math.floor(state.volume or 100))))
+		:gsub("{progress}", escape_gsub(progress_bar(state.position, state.duration, M.config.progress_width)))
+		:gsub("{speed}", escape_gsub(speed))
 
 	cached_line = result
 	cached_hash = h
