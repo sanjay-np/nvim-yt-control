@@ -30,19 +30,39 @@ local state_mod = require("yt-player.state")
 
 local ns_id = vim.api.nvim_create_namespace("yt_player_ui")
 
--- Improved visualizer frames - cleaner, more musical look
+-- Improved visualizer frames - rock-solid 1-cell characters only, zero alignment shifting
 local visualizer_frames = {
-	" ▁▃▅▇▅▃▁ ",
-	"▂▄▆█▆▄▂",
-	"▄▆█▇█▆▄▂",
-	"▆█▇▆▇█▆▄",
-	"█▇▆▄▂▄▆▇",
-	"▇▆▄▂▄▆▇",
-	"▆▄▂▄▆▇▆",
-	"▄▂▄▆▇▆▄",
-	"▂▄▆▇▆▄▂",
+	"▃ ▅ ▇ █ ▇ ▅ ▃   ▃ ▅ ▇ █ ▇ ▅ ▃",
+	"▅ ▇ █ ▆ █ ▇ ▅ ▂ ▅ ▇ █ ▆ █ ▇ ▅",
+	"▇ █ ▆ ▄ ▆ █ ▇ ▃ ▇ █ ▆ ▄ ▆ █ ▇",
+	"█ ▆ ▄ ▂ ▄ ▆ █ ▅ █ ▆ ▄ ▂ ▄ ▆ █",
+	"▆ ▄ ▂   ▂ ▄ ▆ ▇ ▆ ▄ ▂   ▂ ▄ ▆",
+	"▄ ▂   ▂   ▂ ▄ ▆ ▄ ▂   ▂   ▂ ▄",
+	"▂   ▂ ▃ ▂   ▂ ▄ ▂   ▂ ▃ ▂   ▂",
+	"  ▂ ▃ ▅ ▃ ▂   ▂   ▂ ▃ ▅ ▃ ▂  ",
+	"▂ ▃ ▅ ▇ ▅ ▃ ▂   ▂ ▃ ▅ ▇ ▅ ▃ ▂",
 }
 local frame_idx = 1
+
+-- Spinning Vinyl Art with 8 animated frames
+local vinyl_frames = {
+	{ "╭───♫───╮", "│  💿   │", "│  ♪    │", "╰───────╯" },
+	{ "╭───────╮", "│ ♩ 💿  │", "│       │", "╰───♬───╯" },
+	{ "╭───♪───╮", "│   💿  │", "│    ♫  │", "╰───────╯" },
+	{ "╭───────╮", "│  💿 ♬ │", "│       │", "╰───♩───╯" },
+	{ "╭───♩───╮", "│  💿   │", "│  ♫    │", "╰───────╯" },
+	{ "╭───────╮", "│ ♪ 💿  │", "│       │", "╰───♬───╯" },
+	{ "╭───♬───╮", "│   💿  │", "│    ♩  │", "╰───────╯" },
+	{ "╭───────╮", "│  💿 ♫ │", "│       │", "╰───♪───╯" },
+}
+
+-- Paused cover art
+local paused_art = {
+	"╭───────╮",
+	"│  💿   │",
+	"│  💤   │",
+	"╰───────╯",
+}
 
 -- Track panel/float window widths
 local panel_width = 40
@@ -51,17 +71,17 @@ local float_width = 50
 local function progress_bar(position, duration, width)
 	width = width or 20
 	if not duration or duration <= 0 then
-		return string.rep("─", width)
+		return string.rep("─", width), 0
 	end
 	local pct = math.min((position or 0) / duration, 1)
 	local filled = math.floor(pct * width)
 
 	if filled == 0 then
-		return "○" .. string.rep("─", width - 1)
+		return "○" .. string.rep("─", width - 1), 0
 	elseif filled >= width then
-		return string.rep("━", width - 1) .. "●"
+		return string.rep("━", width - 1) .. "●", width
 	else
-		return string.rep("━", filled) .. "●" .. string.rep("─", width - filled - 1)
+		return string.rep("━", filled) .. "●" .. string.rep("─", width - filled - 1), filled
 	end
 end
 
@@ -150,30 +170,26 @@ local function get_cached_footer(width)
 	return _static_cache.footer
 end
 
--- Setup highlight groups (Dracula-inspired colors for dark theme)
+-- Setup highlight groups (Dracula-inspired colors for dark theme with ANSI fallbacks)
 local function setup_highlights()
 	-- Only setup once
 	if M.highlights_setup then
 		return
 	end
 
-	-- Check if terminal supports true color
-	if not vim.o.termguicolors then
-		return
-	end
-
 	local highlights = {
-		YtPlayerTitle = { fg = "#bd93f9", bold = true }, -- Purple
-		YtPlayerArtist = { fg = "#6272a4" }, -- Grayish blue
-		YtPlayerProgress = { fg = "#50fa7b" }, -- Green
-		YtPlayerProgressBg = { fg = "#44475a" }, -- Dark gray
-		YtPlayerControls = { fg = "#8be9fd" }, -- Cyan
-		YtPlayerVolume = { fg = "#ffb86c" }, -- Orange
-		YtPlayerRadio = { fg = "#ff79c6" }, -- Pink
-		YtPlayerQueue = { fg = "#f8f8f2" }, -- White
-		YtPlayerQueueCurrent = { fg = "#50fa7b", bold = true }, -- Green bold
-		YtPlayerBorder = { fg = "#6272a4" }, -- Gray border
-		YtPlayerHelp = { fg = "#6272a4" }, -- Gray help
+		YtPlayerTitle = { fg = "#bd93f9", ctermfg = 141, bold = true, cterm = { bold = true } }, -- Purple
+		YtPlayerArtist = { fg = "#6272a4", ctermfg = 60 }, -- Grayish blue
+		YtPlayerProgress = { fg = "#50fa7b", ctermfg = 84 }, -- Green
+		YtPlayerProgressBg = { fg = "#44475a", ctermfg = 238 }, -- Dark gray
+		YtPlayerControls = { fg = "#8be9fd", ctermfg = 117 }, -- Cyan
+		YtPlayerVolume = { fg = "#ffb86c", ctermfg = 215 }, -- Orange
+		YtPlayerVolumeBg = { fg = "#44475a", ctermfg = 238 }, -- Dark gray
+		YtPlayerRadio = { fg = "#ff79c6", ctermfg = 212 }, -- Pink
+		YtPlayerQueue = { fg = "#f8f8f2", ctermfg = 255 }, -- White
+		YtPlayerQueueCurrent = { fg = "#50fa7b", ctermfg = 84, bold = true, cterm = { bold = true } }, -- Green bold
+		YtPlayerBorder = { fg = "#6272a4", ctermfg = 60 }, -- Gray border
+		YtPlayerHelp = { fg = "#6272a4", ctermfg = 60 }, -- Gray help
 	}
 
 	for name, opts in pairs(highlights) do
@@ -222,7 +238,6 @@ local function build_lines(state, is_float)
 		frame_idx = (frame_idx % #visualizer_frames) + 1
 	end
 
-	local vis = is_playing and visualizer_frames[frame_idx] or "         "
 	local title = state.title or "No Track"
 	local artist = state.artist or "Unknown Artist"
 	if artist == "" then
@@ -234,9 +249,6 @@ local function build_lines(state, is_float)
 
 	local pos_str = utils.format_time(state.position)
 	local dur_str = utils.format_time(state.duration)
-	local pct = (state.duration and state.duration > 0)
-			and string.format("%d%%", math.floor((state.position or 0) / state.duration * 100))
-		or "0%"
 
 	local lines = {}
 	local highlights = {} -- Store highlights for each line
@@ -278,42 +290,130 @@ local function build_lines(state, is_float)
 		end
 	end
 
+	-- Helper to add a seamless box-splitting horizontal separator
+	local function add_split_line()
+		table.insert(lines, string.format("├%s┤", string.rep("─", width - 2)))
+		if M.config.colors then
+			table.insert(highlights, { line = #lines - 1, hl = "YtPlayerBorder", col_start = 0, col_end = -1 })
+		end
+	end
+
 	-- Calculate split: album art + track info
-	local art_width = 7
+	local art_width = 9
 	local info_width = content_width - art_width - 1
 
-	-- Helper to add album art + track info row with clean borders
+	-- Helper to add album art + track info row with clean borders (dynamically computed byte lengths)
 	local function add_art_row(art_line, info_line, hl)
 		local padded_info = pad_right(info_line, info_width)
 		table.insert(lines, string.format("│ %s %s │", art_line, padded_info))
 		if M.config.colors then
 			local line_idx = #lines - 1
+			local art_len = string.len(art_line)
+			local info_len = string.len(padded_info)
+			
 			-- Left border
 			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 0, col_end = 3 })
 			-- Album Art
-			table.insert(highlights, { line = line_idx, hl = "YtPlayerArtist", col_start = 4, col_end = 11 })
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerArtist", col_start = 4, col_end = 4 + art_len })
 			-- Track info
 			if hl then
-				table.insert(highlights, { line = line_idx, hl = hl, col_start = 12, col_end = 12 + #padded_info })
+				table.insert(highlights, { line = line_idx, hl = hl, col_start = 4 + art_len + 1, col_end = 4 + art_len + 1 + info_len })
 			end
 			-- Right border
-			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 12 + #padded_info + 1, col_end = -1 })
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 4 + art_len + 1 + info_len + 1, col_end = -1 })
+		end
+	end
+
+	-- Helper to add a multi-colored progress bar row
+	local function add_progress_row(pos_str, prog_bar, dur_str, filled_count, bar_width)
+		local prog_line = string.format("%s %s %s", pos_str, prog_bar, dur_str)
+		local padded = pad_right(prog_line, content_width)
+		table.insert(lines, string.format("│ %s │", padded))
+
+		if M.config.colors then
+			local line_idx = #lines - 1
+			-- Left border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 0, col_end = 3 })
+
+			-- Elapsed time
+			local len_pos = string.len(pos_str)
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerHelp", col_start = 4, col_end = 4 + len_pos })
+
+			-- Space between pos_str and progress bar (1 byte)
+			local prog_start = 4 + len_pos + 1
+
+			-- Filled progress bar part
+			local filled_bytes = filled_count * 3
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerProgress", col_start = prog_start, col_end = prog_start + filled_bytes })
+
+			-- Unfilled progress bar part
+			local unfilled_bytes = (bar_width - filled_count) * 3
+			if unfilled_bytes > 0 then
+				table.insert(highlights, { line = line_idx, hl = "YtPlayerProgressBg", col_start = prog_start + filled_bytes, col_end = prog_start + filled_bytes + unfilled_bytes })
+			end
+
+			-- Space between progress bar and dur_str (1 byte)
+			local dur_start = prog_start + bar_width * 3 + 1
+			local len_dur = string.len(dur_str)
+
+			-- Duration time
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerHelp", col_start = dur_start, col_end = dur_start + len_dur })
+
+			-- Right border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 4 + #padded + 1, col_end = -1 })
+		end
+	end
+
+	-- Helper to add a multi-colored volume bar row
+	local function add_volume_row(vol_icon, vol_gauge, vol, speed_str, vol_bars)
+		local vol_line = string.format("%s %s %d%%   ⚡ %s", vol_icon, vol_gauge, vol, speed_str)
+		local padded = pad_right(vol_line, content_width)
+		table.insert(lines, string.format("│ %s │", padded))
+
+		if M.config.colors then
+			local line_idx = #lines - 1
+			-- Left border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 0, col_end = 3 })
+
+			-- Volume icon (starts at 4, length is #vol_icon)
+			local len_icon = string.len(vol_icon)
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerVolume", col_start = 4, col_end = 4 + len_icon })
+
+			-- Space between icon and gauge (1 byte)
+			local gauge_start = 4 + len_icon + 1
+
+			-- Filled volume blocks
+			local filled_bytes = vol_bars * 3
+			if filled_bytes > 0 then
+				table.insert(highlights, { line = line_idx, hl = "YtPlayerVolume", col_start = gauge_start, col_end = gauge_start + filled_bytes })
+			end
+
+			-- Unfilled volume blocks
+			local unfilled_bytes = (10 - vol_bars) * 3
+			if unfilled_bytes > 0 then
+				table.insert(highlights, { line = line_idx, hl = "YtPlayerVolumeBg", col_start = gauge_start + filled_bytes, col_end = gauge_start + filled_bytes + unfilled_bytes })
+			end
+
+			-- Suffix (%d%%   ⚡ %s) starts at gauge_start + 30
+			local suffix_start = gauge_start + 30
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerVolume", col_start = suffix_start, col_end = 4 + #padded })
+
+			-- Right border
+			table.insert(highlights, { line = line_idx, hl = "YtPlayerBorder", col_start = 4 + #padded + 1, col_end = -1 })
 		end
 	end
 
 	-- ╭─ Header ───────────────────────╮
 	-- LAYER 1: Track title + artist - PROMINENT
-	-- Normal: Full visual hierarchy
 	add_border_line(get_cached_header("Now Playing", width))
 
-	-- Album Art Placeholder (left side) + Track Info (right side)
-	-- All lines must be exactly 7 chars for proper alignment
-	local album_art = {
-		"[~~~~~]",
-		"[Album]",
-		"[ Art ]",
-		"-------",
-	}
+	-- Animated vinyl cover art selection
+	local album_art
+	if is_playing then
+		album_art = vinyl_frames[((frame_idx - 1) % #vinyl_frames) + 1]
+	else
+		album_art = paused_art
+	end
 
 	-- Add album art + track info row
 	for i, art_line in ipairs(album_art) do
@@ -328,15 +428,6 @@ local function build_lines(state, is_float)
 		elseif i == 3 then
 			-- Duration info
 			info_line = string.format("⏱ %s / %s", pos_str, dur_str)
-		elseif i == 4 then
-			-- View count / playlist info if available
-			if state.view_count then
-				info_line = string.format("👁 %s views", state.view_count)
-			elseif state.playlist_name then
-				info_line = "📋 " .. utils.safe_truncate(state.playlist_name, info_width - 2)
-			else
-				info_line = ""
-			end
 		else
 			info_line = ""
 		end
@@ -345,38 +436,36 @@ local function build_lines(state, is_float)
 
 	-- Visualizer
 	if M.config.show_visualizer then
-		add_center("▃▅▆  " .. vis .. "  ▆▅▃", "YtPlayerProgress")
+		local vis_frame = is_playing and visualizer_frames[frame_idx] or " ▂ ▃ ▄ ▃ ▂   ▂ ▃ ▄ ▃ ▂ "
+		add_center(vis_frame, "YtPlayerProgress")
 	end
 
-	-- Layer 2: Playback status + progress
-	local prog_bar = progress_bar(state.position, state.duration, width - 22)
-	local prog_line = string.format("%s %s %s", pos_str, prog_bar, dur_str)
-	add_row(prog_line, "YtPlayerProgress")
+	-- Layer 2: Playback status + progress (multi-colored)
+	local bar_width = width - 22
+	local prog_bar, filled = progress_bar(state.position, state.duration, bar_width)
+	local filled_count = math.max(1, math.min(bar_width, filled + 1))
+	add_progress_row(pos_str, prog_bar, dur_str, filled_count, bar_width)
 
-	-- Layer 3: Volume + Speed (secondary info)
+	-- Layer 3: Volume + Speed (multi-colored)
 	local vol_icon = (state.muted or vol == 0) and "🔇" or (vol > 50 and "🔊" or "🔉")
-	local vol_line = string.format("%s %d%%  ⏩ %s", vol_icon, vol, speed_str)
-	add_row(vol_line, "YtPlayerVolume")
-
-	-- Controls: compact icons
-	local ctrl_icon = is_playing and "⏸" or "▶"
-	local ctrl = string.format("⏮ │ %s │ ⏭    %s │ 🔀", ctrl_icon, vol_icon)
-	add_center(ctrl, "YtPlayerControls")
+	local vol_bars = math.floor(vol / 10)
+	local vol_gauge = string.rep("▰", vol_bars) .. string.rep("▱", 10 - vol_bars)
+	add_volume_row(vol_icon, vol_gauge, vol, speed_str, vol_bars)
 
 	-- Loop indicator
 	local mode_str = ""
-	local mode_hl = ""
 	if state.loop_file and state.loop_file ~= "no" and state.loop_file ~= false then
-		mode_str = "🔂 Loop: Track"
-		mode_hl = "YtPlayerRadio"
+		mode_str = "🔂 Track"
 	elseif state.loop_playlist and state.loop_playlist ~= "no" and state.loop_playlist ~= false then
-		mode_str = "🔁 Loop: Playlist"
-		mode_hl = "YtPlayerRadio"
+		mode_str = "🔁 Playlist"
 	end
 
-	if mode_str ~= "" then
-		add_center(mode_str, mode_hl)
-	end
+	-- Controls: compact consolidated dashboard icons
+	local ctrl_icon = is_playing and "⏸" or "▶"
+	local ctrl = string.format("⏮  %s  ⏭    %s    %s", ctrl_icon, vol_icon, mode_str ~= "" and mode_str or "🔀 Normal")
+	
+	add_split_line()
+	add_center(ctrl, "YtPlayerControls")
 
 	-- Footer
 	add_border_line(get_cached_footer(width))

@@ -45,32 +45,32 @@ function M.setup_highlights()
 		colors.footer = colors.channel
 	end
 
-	-- Define highlights
+	-- Define highlights with cterm ANSI fallbacks
 	local highlights = {
-		YTSearchPrompt = { fg = colors.prompt, bold = true },
-		YTSearchInput = { fg = colors.input },
-		YTSearchMode = { fg = colors.mode, bold = true },
-		YTSearchIndex = { fg = "#7f849c" },
-		YTSearchTitle = { fg = colors.title, bg = "None", bold = true },
-		YTSearchChannel = { fg = colors.channel, bg = "None" },
-		YTSearchDuration = { fg = colors.duration },
-		YTSearchSelected = { fg = colors.selected_fg, bg = colors.selected_bg, bold = true },
-		YTSearchSelectedTitle = { fg = "#cba6f7", bg = colors.selected_bg, bold = true },
-		YTSearchSelectedMeta = { fg = "#a6adc8", bg = colors.selected_bg },
-		YTSearchSelectedDur = { fg = colors.duration, bg = colors.selected_bg, bold = true },
-		YTSearchAccent = { fg = "#cba6f7", bg = colors.selected_bg, bold = true },
-		YTSearchPlaying = { fg = colors.playing, bold = true },
-		YTSearchPlayingTitle = { fg = colors.playing, bold = true },
-		YTSearchPlayingMeta = { fg = colors.playing },
-		YTSearchPlayingBadge = { fg = "#1e1e2e", bg = colors.playing, bold = true },
-		YTSearchLoading = { fg = colors.loading, italic = true },
-		YTSearchError = { fg = colors.error, bold = true },
-		YTSearchEmpty = { fg = colors.empty, italic = true },
-		YTSearchFooter = { fg = colors.footer },
-		YTSearchHotkey = { fg = colors.hotkey, bold = true },
-		YTSearchBorder = { fg = colors.border },
-		YTSearchSeparator = { fg = "#313244" },
-		YTSearchResultCount = { fg = colors.index, italic = true },
+		YTSearchPrompt = { fg = colors.prompt, ctermfg = 111, bold = true, cterm = { bold = true } },
+		YTSearchInput = { fg = colors.input, ctermfg = 255 },
+		YTSearchMode = { fg = colors.mode, ctermfg = 222, bold = true, cterm = { bold = true } },
+		YTSearchIndex = { fg = "#7f849c", ctermfg = 244 },
+		YTSearchTitle = { fg = colors.title, ctermfg = 255, bg = "None", bold = true, cterm = { bold = true } },
+		YTSearchChannel = { fg = colors.channel, ctermfg = 248, bg = "None" },
+		YTSearchDuration = { fg = colors.duration, ctermfg = 211 },
+		YTSearchSelected = { fg = colors.selected_fg, ctermfg = 224, bg = colors.selected_bg, ctermbg = 237, bold = true, cterm = { bold = true } },
+		YTSearchSelectedTitle = { fg = "#cba6f7", ctermfg = 183, bg = colors.selected_bg, ctermbg = 237, bold = true, cterm = { bold = true } },
+		YTSearchSelectedMeta = { fg = "#a6adc8", ctermfg = 248, bg = colors.selected_bg, ctermbg = 237 },
+		YTSearchSelectedDur = { fg = colors.duration, ctermfg = 211, bg = colors.selected_bg, ctermbg = 237, bold = true, cterm = { bold = true } },
+		YTSearchAccent = { fg = "#cba6f7", ctermfg = 183, bg = colors.selected_bg, ctermbg = 237, bold = true, cterm = { bold = true } },
+		YTSearchPlaying = { fg = colors.playing, ctermfg = 120, bold = true, cterm = { bold = true } },
+		YTSearchPlayingTitle = { fg = colors.playing, ctermfg = 120, bold = true, cterm = { bold = true } },
+		YTSearchPlayingMeta = { fg = colors.playing, ctermfg = 120 },
+		YTSearchPlayingBadge = { fg = "#1e1e2e", ctermfg = 234, bg = colors.playing, ctermbg = 120, bold = true, cterm = { bold = true } },
+		YTSearchLoading = { fg = colors.loading, ctermfg = 222, italic = true, cterm = { italic = true } },
+		YTSearchError = { fg = colors.error, ctermfg = 211, bold = true, cterm = { bold = true } },
+		YTSearchEmpty = { fg = colors.empty, ctermfg = 244, italic = true, cterm = { italic = true } },
+		YTSearchFooter = { fg = colors.footer, ctermfg = 244 },
+		YTSearchHotkey = { fg = colors.hotkey, ctermfg = 116, bold = true, cterm = { bold = true } },
+		YTSearchBorder = { fg = colors.border, ctermfg = 239 },
+		YTSearchSeparator = { fg = "#313244", ctermfg = 237 },
+		YTSearchResultCount = { fg = colors.index, ctermfg = 244, italic = true, cterm = { italic = true } },
 	}
 
 	for name, opts in pairs(highlights) do
@@ -207,6 +207,8 @@ function M.search(query, count, offset, callback)
 						duration = duration,
 						channel = type(item.channel) == "string" and item.channel
 							or (type(item.uploader) == "string" and item.uploader or ""),
+						upload_date = type(item.upload_date) == "string" and item.upload_date
+							or (type(item.release_date) == "string" and item.release_date or nil),
 					}
 				end
 			end
@@ -408,6 +410,16 @@ function M.interactive_picker(initial_query)
 	-- Re-measure actual width
 	width = vim.api.nvim_win_get_width(win)
 
+	-- Helper to dynamically update window title
+	local function update_window_title(title_text)
+		if win and vim.api.nvim_win_is_valid(win) then
+			pcall(vim.api.nvim_win_set_config, win, {
+				title = " " .. title_text .. " ",
+				title_pos = "center",
+			})
+		end
+	end
+
 	-- State
 	local current_query = initial_query or ""
 	local is_searching = false
@@ -509,6 +521,8 @@ function M.interactive_picker(initial_query)
 			return
 		end
 
+		update_window_title("🔍 Searching...")
+
 		local spinners = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
 		spinner_idx = (spinner_idx % #spinners) + 1
 		local spinner = spinners[spinner_idx]
@@ -552,7 +566,7 @@ function M.interactive_picker(initial_query)
 			local is_playing = (r.url == current_playing_url)
 
 			local dur = fmt_duration(r.duration)
-			local accent = is_playing and " ▶" or (is_selected and " ▎" or "  ")
+			local accent = is_playing and " ♫" or (is_selected and " ❯" or "  ")
 			local idx_str = string.format("%2d", i)
 
 			local prefix_width = vim.fn.strdisplaywidth(accent) + 1 + vim.fn.strdisplaywidth(idx_str) + 2
@@ -563,12 +577,24 @@ function M.interactive_picker(initial_query)
 			local indent = string.rep(" ", vim.fn.strdisplaywidth(accent) + 1 + vim.fn.strdisplaywidth(idx_str) + 2)
 			local channel = r.channel and r.channel ~= "" and (r.channel:gsub("[\n\r]", " ")) or ""
 
+			-- Format upload date (e.g. YYYYMMDD -> YYYY-MM-DD)
+			local upload_date_formatted = nil
+			if r.upload_date and type(r.upload_date) == "string" and #r.upload_date == 8 then
+				local y = r.upload_date:sub(1, 4)
+				local m = r.upload_date:sub(5, 6)
+				local d = r.upload_date:sub(7, 8)
+				upload_date_formatted = string.format("%s-%s-%s", y, m, d)
+			end
+
 			local meta_parts = {}
 			if channel ~= "" then
-				table.insert(meta_parts, channel)
+				table.insert(meta_parts, "📺 " .. channel)
 			end
 			if dur ~= "" then
-				table.insert(meta_parts, dur)
+				table.insert(meta_parts, "⏱ " .. dur)
+			end
+			if upload_date_formatted then
+				table.insert(meta_parts, "📅 " .. upload_date_formatted)
 			end
 			if is_playing then
 				table.insert(meta_parts, "♫ Now Playing")
@@ -579,7 +605,7 @@ function M.interactive_picker(initial_query)
 			table.insert(display, title_line)
 			table.insert(display, meta_line)
 			if i < end_idx then
-				table.insert(display, "")
+				table.insert(display, "  " .. string.rep("─", width - 4))
 			end
 		end
 
@@ -630,7 +656,7 @@ function M.interactive_picker(initial_query)
 			local is_selected = (i == selected_idx)
 			local is_playing = (r.url == current_playing_url)
 
-			local accent_byte_len = is_playing and #" ▶" or (is_selected and #" ▎" or 2)
+			local accent_byte_len = (is_playing or is_selected) and 4 or 2
 
 			if is_playing then
 				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlaying", title_ln, 0, accent_byte_len)
@@ -693,6 +719,11 @@ function M.interactive_picker(initial_query)
 
 		vim.bo[buf].modifiable = false
 
+		-- Update window title dynamically to show count
+		if not is_loading_more then
+			update_window_title("♫ YouTube Search (" .. #results .. ")")
+		end
+
 		-- Update footer
 		render_footer()
 
@@ -713,6 +744,7 @@ function M.interactive_picker(initial_query)
 			return
 		end
 		is_loading_more = true
+		update_window_title("♫ YouTube Search (" .. #results .. "+)")
 		local limit = require("yt-player").config.search.limit or 10
 		render_results() -- Update UI to show loading indicator
 		current_job = M.search(current_query, limit, current_offset, function(new_results, err)
@@ -798,6 +830,7 @@ function M.interactive_picker(initial_query)
 			end
 
 			if err then
+				update_window_title("❌ Search Error")
 				vim.bo[buf].modifiable = true
 				vim.api.nvim_buf_set_lines(buf, HEADER_LINES, -1, false, { "  Error: " .. err })
 				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchError", HEADER_LINES, 0, -1)
@@ -806,6 +839,7 @@ function M.interactive_picker(initial_query)
 			end
 
 			if #res == 0 then
+				update_window_title("🔍 No Results")
 				vim.bo[buf].modifiable = true
 				vim.api.nvim_buf_set_lines(buf, HEADER_LINES, -1, false, { "  No results found." })
 				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchEmpty", HEADER_LINES, 0, -1)
@@ -869,7 +903,7 @@ function M.interactive_picker(initial_query)
 			local is_selected = (i == selected_idx)
 			local is_playing = (r.url == current_playing_url)
 
-			local accent_byte_len = is_playing and #" ▶" or (is_selected and #" ▎" or 2)
+			local accent_byte_len = (is_playing or is_selected) and 4 or 2
 
 			if is_playing then
 				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlaying", title_ln, 0, accent_byte_len)
