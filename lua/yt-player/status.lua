@@ -22,7 +22,7 @@ end
 
 local function state_hash(s)
 	return string.format(
-		"%s|%s|%s|%s|%d|%d|%d|%.2f",
+		"%s|%s|%s|%s|%d|%d|%d|%.2f|%s",
 		tostring(s.connected),
 		tostring(s.playing),
 		s.title or "",
@@ -30,7 +30,8 @@ local function state_hash(s)
 		math.floor(s.position or 0),
 		math.floor(s.duration or 0),
 		math.floor(s.volume or 100),
-		s.speed or 1
+		s.speed or 1,
+		tostring(s.radio_enabled)
 	)
 end
 
@@ -68,6 +69,7 @@ function M.get_statusline()
 	end
 
 	local speed = (state.speed and state.speed ~= 1) and string.format("%.2gx", state.speed) or ""
+	local radio_tag = state.radio_enabled and "📻" or ""
 
 	local result = M.config.format
 		:gsub("{icon}", escape_gsub(icon))
@@ -79,6 +81,7 @@ function M.get_statusline()
 		:gsub("{volume}", escape_gsub(tostring(math.floor(state.volume or 100))))
 		:gsub("{progress}", escape_gsub(progress_bar(state.position, state.duration, M.config.progress_width)))
 		:gsub("{speed}", escape_gsub(speed))
+		:gsub("{radio}", escape_gsub(radio_tag))
 
 	cached_line = result
 	cached_hash = h

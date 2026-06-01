@@ -462,7 +462,8 @@ local function build_lines(state, is_float)
 
 	-- Controls: compact consolidated dashboard icons
 	local ctrl_icon = is_playing and "⏸" or "▶"
-	local ctrl = string.format("⏮  %s  ⏭    %s    %s", ctrl_icon, vol_icon, mode_str ~= "" and mode_str or "🔀 Normal")
+	local mode_tag = state.radio_enabled and "📻 Radio" or (mode_str ~= "" and mode_str or "🔀 Normal")
+	local ctrl = string.format("⏮  %s  ⏭    %s    %s", ctrl_icon, vol_icon, mode_tag)
 	
 	add_split_line()
 	add_center(ctrl, "YtPlayerControls")
@@ -473,7 +474,7 @@ local function build_lines(state, is_float)
 	-- Layer 4: Help section - reduced to 1 line (conditional)
 	if M.config.show_help then
 		add_border_line(get_cached_section_header("Controls", width))
-		add_row("[p/s/t]Play [b/n]Nav [m]Vol [</>]Speed [0-9]Seek [q]Exit", "YtPlayerHelp")
+		add_row("[p/s/t]Play [b/n]Nav [r]Radio [</>]Spd [0-9]Seek [q]Exit", "YtPlayerHelp")
 		add_border_line(get_cached_footer(width))
 	end
 
@@ -649,6 +650,12 @@ local function setup_keymaps(buf, is_float)
 		else
 			require("yt-player").command({ "set_property", "loop-file", "inf" })
 		end
+		vim.defer_fn(refresh, 200)
+	end, o)
+
+	-- Radio toggle control
+	vim.keymap.set("n", "r", function()
+		require("yt-player.radio").toggle()
 		vim.defer_fn(refresh, 200)
 	end, o)
 

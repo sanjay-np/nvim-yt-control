@@ -41,6 +41,11 @@ M.config = {
 		speed_down = "<",
 	},
 
+	radio = {
+		enabled = true,
+		limit = 5,
+	},
+
 	sponsorblock = false, -- Set to true to enable auto-skipping
 }
 

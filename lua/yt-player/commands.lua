@@ -264,6 +264,12 @@ function M._register()
 			end,
 			desc = "Manage local playlists",
 		},
+		radio = {
+			impl = function()
+				require("yt-player.radio").toggle()
+			end,
+			desc = "Toggle autoplay radio mode",
+		},
 		resume = {
 			impl = function()
 				require("yt-player.session").restore()

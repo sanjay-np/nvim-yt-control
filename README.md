@@ -16,6 +16,7 @@ A premium, lightweight, asynchronous YouTube audio player built directly inside 
 - **📝 Interactive Queue Editor (`:YT queue_edit`)**: Reorder tracks with `J`/`K` or delete them with `dd` in real-time.
 - **🎵 Seamless Playlist Ingestion (`:YT queue_playlist`)**: Rapidly ingest and parse YouTube playlists containing 100+ tracks without blocking the UI.
 - **⏩ Auto SponsorBlock**: Automatically skip sponsors, intros, and non-music off-topic segments (enable in config).
+- **📻 Autoplay Radio Mode (`:YT radio`)**: Endless recommendation stream (enabled by default). Spawns the YouTube Mix playlist matching your active song, deduplicates against active queue and history, and seamlessly appends fresh tracks before your queue ends.
 - **📊 Lualine & Statusline Integration**: Formats playing state, volume, speed, and real-time progress bars smoothly for statuslines.
 - **🕐 Persistent Play History (`:YT history`)**: Stores recently played tracks so you can jump back or queue them later.
 
@@ -107,6 +108,7 @@ All functions are available under the master command `:YT` with rich autocomplet
 | `:YT queue_playlist <url>` | Parse and append all tracks from a YouTube playlist URL |
 | `:YT queue_edit` | Open the interactive queue editor |
 | `:YT playlists` | Open the split-pane local playlist manager |
+| `:YT radio` | Toggle autoplay radio mode (ON by default) |
 | `:YT history` | Open the persistent play history picker |
 | `:YT history_clear` | Clear play history |
 | `:YT resume` | Resume the last persistent playback session |
@@ -135,6 +137,7 @@ When either the side-panel (`:YT player`) or floating window (`:YT mini`) is foc
 | `0` to `9` | **Seek** to absolute percentage (`0%` to `90%` of track) |
 | `G` | **Seek** to 100% (ends track) |
 | `R` | **Cycle Repeat Mode** (Track 🔂 ➔ Playlist 🔁 ➔ Off) |
+| `r` | **Toggle Autoplay Radio Mode** |
 | `q` / `<Esc>` | **Close** player window |
 
 ---
@@ -184,6 +187,11 @@ require("yt-player").setup({
     speed_down = "<",
   },
   
+  radio = {
+    enabled = true, -- set to false to disable autoplay radio by default
+    limit = 5,      -- number of related tracks to fetch at a time
+  },
+  
   sponsorblock = false, -- set to true to automatically skip YouTube sponsor segments
 })
 ```
@@ -198,6 +206,7 @@ Use these placeholders to customize your statusline:
 - `{progress}` — Interactive progress bar (e.g. `▓▓▓░░░░░░░`)
 - `{volume}` — Volume percentage
 - `{speed}` — Speed multiplier (e.g. `1.25x`)
+- `{radio}` — Autoplay radio status icon (renders `📻` when enabled)
 
 ### Lualine Integration
 Add `yt-player` directly to your lualine configuration sections:
