@@ -148,6 +148,8 @@ function M.get_related_tracks(video_id, limit, callback)
 						url = type(item.webpage_url) == "string" and item.webpage_url
 							or (type(item.url) == "string" and item.url or ""),
 						duration = duration,
+						channel = type(item.channel) == "string" and item.channel
+							or (type(item.uploader) == "string" and item.uploader or ""),
 					}
 				end
 			end
@@ -254,7 +256,11 @@ function M.check_and_trigger()
 			if track.url ~= "" and not existing[track.url] then
 				-- Append to metadata store so the UI is immediately populated
 				state.playlist_meta = state.playlist_meta or {}
+				state.artist_map = state.artist_map or {}
 				state.playlist_meta[track.url] = track.title or "Unknown"
+				if track.channel and track.channel ~= "" then
+					state.artist_map[track.url] = track.channel
+				end
 
 				-- Append to mpv queue
 				mpv.send_command({ "loadfile", track.url, "append" })

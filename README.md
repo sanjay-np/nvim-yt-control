@@ -19,6 +19,8 @@ A premium, lightweight, asynchronous YouTube audio player built directly inside 
 - **📻 Autoplay Radio Mode (`:YT radio`)**: Endless recommendation stream (enabled by default). Spawns the YouTube Mix playlist matching your active song, deduplicates against active queue and history, and seamlessly appends fresh tracks before your queue ends.
 - **📊 Lualine & Statusline Integration**: Formats playing state, volume, speed, and real-time progress bars smoothly for statuslines.
 - **🕐 Persistent Play History (`:YT history`)**: Stores recently played tracks so you can jump back or queue them later.
+- **🎨 Currently Playing Track Highlight**: The active track is visually highlighted in green across the queue editor, playlist manager, and history picker.
+- **🔔 Customizable Notifications**: Control the format of track-change notifications with placeholders like `{title}`, `{artist}`, and `{icon}`.
 
 ---
 
@@ -164,6 +166,10 @@ require("yt-player").setup({
   notifications = {
     enabled = true,
     notify_on_track_change = true, -- notify when a new song starts playing
+    format = "▶ {title} - {artist}", -- customizable notification format
+    icon_playing = "▶", -- icon used in notification format
+    icon_paused = "⏸", -- icon used when paused
+    timeout = 3000, -- notification timeout in ms
   },
 
   player = {
@@ -208,6 +214,24 @@ Use these placeholders to customize your statusline:
 - `{speed}` — Speed multiplier (e.g. `1.25x`)
 - `{radio}` — Autoplay radio status icon (renders `📻` when enabled)
 
+### Notification Customization
+Use these placeholders to customize track-change notifications:
+- `{title}` — Current track title
+- `{artist}` — Channel / Uploader name
+- `{icon}` — Playing icon (default `▶`)
+
+Example configurations:
+```lua
+-- Minimal notification
+format = "{title}"
+
+-- Include artist
+format = "▶ {title} - {artist}"
+
+-- With icon placeholder
+format = "{icon} Now playing: {title}"
+```
+
 ### Lualine Integration
 Add `yt-player` directly to your lualine configuration sections:
 ```lua
@@ -216,6 +240,30 @@ require("lualine").setup({
     lualine_x = { "yt-player" }
   }
 })
+```
+
+### Highlight Groups
+All highlight groups can be customized to match your colorscheme. Override them in your Neovim config:
+
+```lua
+-- Player UI highlights
+vim.api.nvim_set_hl(0, "YtPlayerTitle", { fg = "#bd93f9", bold = true })
+vim.api.nvim_set_hl(0, "YtPlayerArtist", { fg = "#6272a4" })
+vim.api.nvim_set_hl(0, "YtPlayerProgress", { fg = "#50fa7b" })
+vim.api.nvim_set_hl(0, "YtPlayerProgressBg", { fg = "#44475a" })
+vim.api.nvim_set_hl(0, "YtPlayerControls", { fg = "#8be9fd" })
+vim.api.nvim_set_hl(0, "YtPlayerVolume", { fg = "#ffb86c" })
+vim.api.nvim_set_hl(0, "YtPlayerVolumeBg", { fg = "#44475a" })
+vim.api.nvim_set_hl(0, "YtPlayerRadio", { fg = "#ff79c6" })
+vim.api.nvim_set_hl(0, "YtPlayerQueue", { fg = "#f8f8f2" })
+vim.api.nvim_set_hl(0, "YtPlayerQueueCurrent", { fg = "#50fa7b", bold = true })
+vim.api.nvim_set_hl(0, "YtPlayerBorder", { fg = "#6272a4" })
+vim.api.nvim_set_hl(0, "YtPlayerHelp", { fg = "#6272a4" })
+
+-- Currently playing track highlights (green by default)
+vim.api.nvim_set_hl(0, "YTQueueCurrent", { fg = "#50fa7b", bold = true })
+vim.api.nvim_set_hl(0, "YTPlaylistCurrent", { fg = "#50fa7b", bold = true })
+vim.api.nvim_set_hl(0, "YTHistoryCurrent", { fg = "#50fa7b", bold = true })
 ```
 
 ---

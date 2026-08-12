@@ -8,6 +8,17 @@ local utils = require("yt-player.utils")
 M.win_id = nil
 M.buf_id = nil
 
+local ns = vim.api.nvim_create_namespace("yt_queue")
+
+local function setup_highlights()
+	pcall(vim.api.nvim_set_hl, 0, "YTQueueCurrent", {
+		fg = "#50fa7b",
+		ctermfg = 84,
+		bold = true,
+		cterm = { bold = true },
+	})
+end
+
 local function render_queue()
 	if not M.buf_id or not vim.api.nvim_buf_is_valid(M.buf_id) then
 		return
@@ -39,6 +50,15 @@ local function render_queue()
 	vim.bo[M.buf_id].modifiable = true
 	vim.api.nvim_buf_set_lines(M.buf_id, 0, -1, false, lines)
 	vim.bo[M.buf_id].modifiable = false
+
+	-- Highlight currently playing track
+	vim.api.nvim_buf_clear_namespace(M.buf_id, ns, 0, -1)
+	if #plist > 0 and state.playlist_pos then
+		local current_line = 4 + state.playlist_pos
+		if current_line < #lines then
+			pcall(vim.api.nvim_buf_add_highlight, M.buf_id, ns, "YTQueueCurrent", current_line, 0, -1)
+		end
+	end
 end
 
 function M.open()
@@ -48,6 +68,7 @@ function M.open()
 		return
 	end
 
+	setup_highlights()
 	M.buf_id = vim.api.nvim_create_buf(false, true)
 
 	local width = math.floor(vim.o.columns * 0.6)

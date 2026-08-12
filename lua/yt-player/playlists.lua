@@ -181,6 +181,12 @@ function M.open_manager()
 	local ns = vim.api.nvim_create_namespace("yt_playlists")
 	vim.api.nvim_set_hl(0, "YTPlaylistHeader", { link = "Title" })
 	vim.api.nvim_set_hl(0, "YTPlaylistMeta", { link = "Comment" })
+	pcall(vim.api.nvim_set_hl, 0, "YTPlaylistCurrent", {
+		fg = "#50fa7b",
+		ctermfg = 84,
+		bold = true,
+		cterm = { bold = true },
+	})
 
 	-- State
 	local selected_playlist_idx = 1
@@ -283,6 +289,23 @@ function M.open_manager()
 		local start_hl = #lines - #help_lines
 		for i = start_hl, #lines - 1 do
 			vim.api.nvim_buf_add_highlight(right_buf, ns, "YTPlaylistMeta", i, 0, -1)
+		end
+
+		-- Highlight currently playing track
+		local state = state_mod.get_current()
+		if state.playlist_pos and state.playlist and state.playlist[state.playlist_pos + 1] then
+			local playing_url = state.playlist[state.playlist_pos + 1].filename
+			if playing_url then
+				for i, t in ipairs(tracks) do
+					if t.url == playing_url then
+						local title_line = (i - 1) * 3
+						if title_line < #lines - #help_lines then
+							pcall(vim.api.nvim_buf_add_highlight, right_buf, ns, "YTPlaylistCurrent", title_line, 0, -1)
+						end
+						break
+					end
+				end
+			end
 		end
 
 		pcall(vim.api.nvim_win_set_cursor, right_win, { 1, 0 })

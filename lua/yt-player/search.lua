@@ -300,8 +300,12 @@ function M.fetch_playlist(url)
 		vim.schedule_wrap(function()
 			if #buffer_items > 0 then
 				state_mod.current.playlist_meta = state_mod.current.playlist_meta or {}
+				state_mod.current.artist_map = state_mod.current.artist_map or {}
 				for _, item in ipairs(buffer_items) do
 					state_mod.current.playlist_meta[item.url] = item.title
+					if item.channel and item.channel ~= "" then
+						state_mod.current.artist_map[item.url] = item.channel
+					end
 					mpv.send_command({ "loadfile", item.url, "append" })
 				end
 				buffer_items = {}
@@ -328,7 +332,9 @@ function M.fetch_playlist(url)
 						or (type(item.url) == "string" and item.url or "")
 					local item_title = type(item.title) == "string" and item.title or "Unknown"
 					if item_url ~= "" then
-						table.insert(buffer_items, { url = item_url, title = item_title })
+						local item_channel = type(item.channel) == "string" and item.channel
+							or (type(item.uploader) == "string" and item.uploader or "")
+						table.insert(buffer_items, { url = item_url, title = item_title, channel = item_channel })
 					end
 				end
 			end
@@ -344,8 +350,12 @@ function M.fetch_playlist(url)
 			if #buffer_items > 0 then
 				vim.schedule(function()
 					state_mod.current.playlist_meta = state_mod.current.playlist_meta or {}
+					state_mod.current.artist_map = state_mod.current.artist_map or {}
 					for _, item in ipairs(buffer_items) do
 						state_mod.current.playlist_meta[item.url] = item.title
+						if item.channel and item.channel ~= "" then
+							state_mod.current.artist_map[item.url] = item.channel
+						end
 						mpv.send_command({ "loadfile", item.url, "append" })
 					end
 					buffer_items = {}

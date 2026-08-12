@@ -32,6 +32,7 @@ function M.save()
 		loop_file = state.loop_file or "no",
 		loop_playlist = state.loop_playlist or "no",
 		playlist_meta = state.playlist_meta or {},
+		artist_map = state.artist_map or {},
 	}
 
 	local f = io.open(session_path(), "w")
@@ -68,15 +69,21 @@ function M.restore()
 
 	-- 1. Restore playlist metadata so UI is immediately accurate
 	state_mod.current.playlist_meta = state_mod.current.playlist_meta or {}
+	state_mod.current.artist_map = state_mod.current.artist_map or {}
 	if data.playlist_meta then
 		for k, v in pairs(data.playlist_meta) do
 			state_mod.current.playlist_meta[k] = v
 		end
 	end
+	if data.artist_map then
+		for k, v in pairs(data.artist_map) do
+			state_mod.current.artist_map[k] = v
+		end
+	end
 
 
 
-	-- 3. Start mpv in idle mode if it is not already running
+	-- 2. Start mpv in idle mode if it is not already running
 	if not mpv.is_running() then
 		mpv.start(nil)
 	end

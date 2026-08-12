@@ -18,6 +18,10 @@ M.config = {
 	notifications = {
 		enabled = true,
 		notify_on_track_change = true,
+		format = "▶ {title} - {artist}",
+		icon_playing = "▶",
+		icon_paused = "⏸",
+		timeout = 3000,
 	},
 
 	player = {
@@ -61,6 +65,7 @@ function M.setup(opts)
 	require("yt-player.notify").setup(M.config.notifications)
 	M.status.setup(M.config.statusline)
 	require("yt-player.commands").setup(M.config)
+	require("yt-player.player").setup(M.config.player)
 
 	if M.config.keymaps.enabled then
 		require("yt-player.keymaps").setup(M.config.keymaps)
@@ -68,7 +73,7 @@ function M.setup(opts)
 
 	vim.g.yt_control_loaded = true
 
-	vim.api.nvim_create_autocmd("VimLeave", {
+	vim.api.nvim_create_autocmd("VimLeavePre", {
 		group = vim.api.nvim_create_augroup("YTControlCleanup", { clear = true }),
 		callback = function()
 			pcall(function()
@@ -93,7 +98,7 @@ end
 
 --- Append a track to the mpv queue (or start playback if mpv isn't running).
 --- Stores the title in playlist_meta so the queue UI can display it.
----@param item table { url: string, title: string }
+---@param item table { url: string, title: string, channel: string|nil }
 function M.queue(item)
 	if not item or not item.url or item.url == "" then
 		return
@@ -101,7 +106,11 @@ function M.queue(item)
 	local mpv = M.mpv
 	local state_mod = M.state
 	state_mod.current.playlist_meta = state_mod.current.playlist_meta or {}
+	state_mod.current.artist_map = state_mod.current.artist_map or {}
 	state_mod.current.playlist_meta[item.url] = item.title or "Unknown"
+	if item.channel and item.channel ~= "" then
+		state_mod.current.artist_map[item.url] = item.channel
+	end
 	if not mpv.is_running() then
 		mpv.load_url(item.url)
 	else

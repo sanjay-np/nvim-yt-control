@@ -32,7 +32,13 @@ function M.track_change(title, artist)
 	if not M.config.notify_on_track_change then
 		return
 	end
-	M.info(string.format("▶ Now playing: %s", title or "Unknown"))
+	local format = M.config.format or "▶ {title} - {artist}"
+	local icon = M.config.icon_playing or "▶"
+	local msg = format
+		:gsub("{title}", title or "Unknown")
+		:gsub("{artist}", artist or "")
+		:gsub("{icon}", icon)
+	M.info(msg)
 end
 
 return M

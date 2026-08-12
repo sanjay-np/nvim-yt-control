@@ -142,6 +142,29 @@ function M.open_picker()
 	local ns = vim.api.nvim_create_namespace("yt_history")
 	vim.api.nvim_buf_add_highlight(buf, ns, "Title", 0, 0, -1)
 
+	-- Highlight currently playing track
+	pcall(vim.api.nvim_set_hl, 0, "YTHistoryCurrent", {
+		fg = "#50fa7b",
+		ctermfg = 84,
+		bold = true,
+		cterm = { bold = true },
+	})
+	local state = require("yt-player.state").get_current()
+	if state.playlist_pos and state.playlist and state.playlist[state.playlist_pos + 1] then
+		local playing_url = state.playlist[state.playlist_pos + 1].filename
+		if playing_url then
+			for i, item in ipairs(history) do
+				if item.url == playing_url then
+					local title_line = (i - 1) * 3 + 2
+					if title_line < #lines then
+						pcall(vim.api.nvim_buf_add_highlight, buf, ns, "YTHistoryCurrent", title_line, 0, -1)
+					end
+					break
+				end
+			end
+		end
+	end
+
 	vim.api.nvim_win_set_cursor(win, { 3, 0 })
 
 	-- Helpers

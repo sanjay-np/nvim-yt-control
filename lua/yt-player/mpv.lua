@@ -339,6 +339,7 @@ function M._connect_ipc_with_retry(attempt)
 				M.send_command({ "observe_property", 10, "playlist-count" })
 				M.send_command({ "observe_property", 11, "loop-file" })
 				M.send_command({ "observe_property", 12, "loop-playlist" })
+				M.send_command({ "observe_property", 13, "metadata" })
 
 				-- Fetch initial properties directly to populate the UI state immediately
 				local function fetch_prop(prop_name)
@@ -356,6 +357,7 @@ function M._connect_ipc_with_retry(attempt)
 				fetch_prop("playlist-pos")
 				fetch_prop("loop-file")
 				fetch_prop("loop-playlist")
+				fetch_prop("metadata")
 
 				-- Flush any pending commands that were queued before IPC was ready
 				M._flush_pending()
@@ -445,6 +447,7 @@ local prop_map = {
 	["playlist-count"] = { key = "playlist_count", default = 0 },
 	["loop-file"] = { key = "loop_file", default = false },
 	["loop-playlist"] = { key = "loop_playlist", default = false },
+	["metadata"] = { key = "metadata", default = {} },
 }
 
 function M._handle_ipc_message(line)
@@ -493,6 +496,20 @@ function M._handle_ipc_message(line)
 					duration = current.duration or 0,
 				})
 			end)
+			-- Populate artist from artist_map (set by search/radio/queue)
+			local url = M.current_url or ""
+			local artist_map = state_mod.current.artist_map or {}
+			if url ~= "" and artist_map[url] then
+				state_mod.update({ artist = artist_map[url] })
+			end
+		end
+
+		-- Extract artist from mpv metadata if available (fallback)
+		if prop_name == "metadata" and type(prop_data) == "table" then
+			local meta_artist = prop_data.artist or prop_data.Artist or ""
+			if meta_artist ~= "" then
+				state_mod.update({ artist = meta_artist })
+			end
 		end
 	elseif msg.event == "end-file" then
 		if msg.reason ~= "stop" and msg.reason ~= "quit" then

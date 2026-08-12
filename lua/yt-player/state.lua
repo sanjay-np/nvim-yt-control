@@ -18,6 +18,7 @@ M.current = {
 	playlist_pos = 0,
 	playlist_count = 0,
 	playlist_meta = {},
+	artist_map = {},
 	radio_enabled = true,
 	radio_fetching = false,
 }
