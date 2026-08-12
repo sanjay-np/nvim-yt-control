@@ -2,6 +2,23 @@
 local M = {}
 
 M.is_fetching = false
+M.active_handle = nil
+
+--- Cancel any active recommendation fetch job
+function M.cancel()
+	if M.active_handle then
+		pcall(function()
+			if not M.active_handle:is_closing() then
+				M.active_handle:kill(15) -- SIGTERM
+				M.active_handle:close()
+			end
+		end)
+		M.active_handle = nil
+	end
+	local state_mod = require("yt-player.state")
+	local state = state_mod.get_current()
+	state.radio_fetching = false
+end
 
 --- Toggle radio mode
 function M.toggle()
@@ -13,6 +30,7 @@ function M.toggle()
 		vim.notify("YT Control: 📻 Autoplay Radio: ON", vim.log.levels.INFO)
 		M.check_and_trigger()
 	else
+		M.cancel()
 		vim.notify("YT Control: 📻 Autoplay Radio: OFF", vim.log.levels.INFO)
 	end
 
@@ -40,10 +58,11 @@ end
 ---@param video_id string
 ---@param limit number
 ---@param callback fun(tracks: table[], err: string|nil)
+---@return uv_process_t|nil handle
 function M.get_related_tracks(video_id, limit, callback)
 	if vim.fn.executable("yt-dlp") == 0 then
 		callback({}, "yt-dlp is not installed or not in PATH")
-		return
+		return nil
 	end
 
 	limit = limit or 5
@@ -98,7 +117,7 @@ function M.get_related_tracks(video_id, limit, callback)
 			end)
 		end
 		callback({}, "Failed to spawn yt-dlp")
-		return
+		return nil
 	end
 
 	local partial_stdout = ""
@@ -137,6 +156,8 @@ function M.get_related_tracks(video_id, limit, callback)
 			end
 		end
 	end)
+
+	return handle
 end
 
 --- Check playback status and trigger recommendation fetch if queue is ending
@@ -190,8 +211,15 @@ function M.check_and_trigger()
 
 	vim.notify("YT Radio: Fetching recommendations based on active track...", vim.log.levels.INFO)
 
-	M.get_related_tracks(video_id, limit, function(tracks, err)
+	M.active_handle = M.get_related_tracks(video_id, limit, function(tracks, err)
+		M.active_handle = nil
 		state.radio_fetching = false
+
+		-- Guard clause: verify radio mode is still enabled before queuing
+		if not state.radio_enabled then
+			return
+		end
+
 		if err then
 			vim.notify("YT Radio: Error - " .. err, vim.log.levels.WARN)
 			return
