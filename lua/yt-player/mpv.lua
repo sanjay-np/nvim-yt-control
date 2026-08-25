@@ -212,6 +212,13 @@ function M.start(url)
 		"--input-ipc-server=" .. M.ipc_socket_path,
 	}
 
+	-- Route stream resolution through yt-dlp player clients that YouTube
+	-- does not 403-block when mpv fetches the resolved URL (see README).
+	local client = M.config.youtube and M.config.youtube.player_client
+	if type(client) == "string" and client ~= "" then
+		table.insert(cmd, "--ytdl-raw-options-append=extractor-args=youtube:player_client=" .. client)
+	end
+
 	register_client()
 	if M.config.sponsorblock then
 		local script_path = ensure_sponsorblock_script()
