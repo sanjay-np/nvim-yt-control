@@ -1,0 +1,30 @@
+name: 💡 Feature Request
+description: Suggest an idea or enhancement for nvim-yt-player
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make `nvim-yt-player` even better? We'd love to hear it!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature request related to a problem or limitation? Please explain.
+      placeholder: "I find it difficult to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or behavior you'd like to see.
+      placeholder: "Add an option or command that..."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or features you've considered.

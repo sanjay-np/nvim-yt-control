@@ -1,6 +1,44 @@
 # 🎵 nvim-yt-player
 
-A premium, lightweight, asynchronous YouTube audio player built directly inside Neovim. Powered by **mpv** and **yt-dlp**, it plays audio seamlessly in the background without freezing your editor or requiring complex Node.js/browser extensions.
+<div align="center">
+
+[![CI](https://github.com/sanjay-np/nvim-yt-player/actions/workflows/ci.yml/badge.svg)](https://github.com/sanjay-np/nvim-yt-player/actions)
+![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-blueviolet?logo=neovim&logoColor=white)
+![Lua](https://img.shields.io/badge/Lua-Pure%20LuaJIT-blue?logo=lua&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
+**A premium, lightweight, asynchronous YouTube music & audio player built directly inside Neovim.**  
+*Powered by pure Lua, UNIX domain socket IPC, mpv, and yt-dlp. Zero external servers. Zero editor lag.*
+
+</div>
+
+---
+
+```
+╭─────────────────────────────── Now Playing ───────────────────────────────╮
+│  ♫  Lofi Hip Hop Radio - Beats to Relax/Study to                          │
+│     Lofi Girl                                                             │
+│                                                                           │
+│            ▄▄████████▄▄               [ 01:42 / 03:30 ]                   │
+│          ███ ░░░░░░░░ ███            ━━━━━━━━●━━━━━━━━━━                  │
+│          ███ ░░  ◉ ░░ ███                                                 │
+│            ▀▀████████▀▀               ▃▅█▇▅▃ ▃▅▇█▇▅▃                      │
+│                                                                           │
+│  🔊 ▰▰▰▰▰▰▰▱▱▱ 70%   ⚡ 1.0x   🔁 Playlist   📻 Radio: ON                   │
+╰───────────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
+## 💡 Why nvim-yt-player?
+
+- 🚀 **Save 1.5GB+ RAM**: Stop keeping Chrome or Brave open with YouTube tabs just to listen to study/coding music in the background.
+- ⚡ **Zero-Freeze Asynchronous IPC**: Communicates directly with `mpv` over a local UNIX domain socket. Stream extraction and playback never block your editor or drop keystrokes.
+- ⏩ **Native SponsorBlock**: Automatically skips sponsor segments, promos, and off-topic music intros so your focus is never broken.
+- 📻 **Endless Autoplay Radio**: Automatically queries and queues fresh YouTube Mix recommendations matching your active track before the queue ends.
+- 👥 **Multi-Instance Sync**: Launch Neovim across multiple tmux panes or terminals—all instances automatically discover and coordinate playback with the shared background daemon.
+- 🎛️ **Zero Dependencies**: Pure Lua + `mpv` + `yt-dlp`. No Python daemons, no Node.js processes, no Electron bloat.
 
 ---
 
@@ -317,6 +355,13 @@ A: Yes! A shared client registry coordinates instances. When you start audio in 
 
 ---
 
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!  
+Check out our [Contributing Guidelines](CONTRIBUTING.md) to get started with local testing and architectural details.
+
+---
+
 ## 📄 License
 
-Distributed under the MIT License.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    name: Headless Lua & Syntax Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim-version: ['v0.9.5', 'stable']
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim-version }}
+
+      - name: Run Plugin Test Suite
+        run: |
+          nvim --headless -u NONE -c 'set rtp+=.' -c 'lua
+          local modules = {
+            "yt-player",
+            "yt-player.commands",
+            "yt-player.history",
+            "yt-player.init",
+            "yt-player.keymaps",
+            "yt-player.mpv",
+            "yt-player.notify",
+            "yt-player.player",
+            "yt-player.playlists",
+            "yt-player.queue",
+            "yt-player.radio",
+            "yt-player.search",
+            "yt-player.session",
+            "yt-player.state",
+            "yt-player.status",
+            "yt-player.utils",
+          }
+
+          for _, mod in ipairs(modules) do
+            local ok, err = pcall(require, mod)
+            if not ok then
+              error("Failed to load module " .. mod .. ": " .. tostring(err))
+            end
+          end
+
+          -- Verify setup
+          require("yt-player").setup({})
+
+          -- Verify commands registration
+          require("yt-player.commands").setup()
+          assert(vim.api.nvim_get_commands({})["YT"] ~= nil, ":YT user command must be registered")
+
+          -- Verify utils.safe_truncate
+          local utils = require("yt-player.utils")
+          assert(utils.safe_truncate("Test Video Title", 10) == "Test Vi...", "safe_truncate failed")
+
+          -- Verify statusline
+          local status = require("yt-player.status")
+          status.setup({ enabled = true, format = "{title}" })
+          require("yt-player.state").set_connected(true)
+          require("yt-player.state").update({ title = "Test Song" })
+          assert(status.get_statusline() == "Test Song", "statusline format failed")
+
+          print("All CI tests passed successfully!")
+          ' -c 'q'

@@ -1,0 +1,56 @@
+name: 🐛 Bug Report
+description: Create a report to help us reproduce and fix an issue
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below to help us reproduce and solve the problem quickly.
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Run ':YT play <url>'
+        2. Press '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+  - type: input
+    id: nvim-version
+    attributes:
+      label: Neovim Version
+      description: Output of `nvim --version`
+      placeholder: "NVIM v0.10.0"
+    validations:
+      required: true
+  - type: input
+    id: system-info
+    attributes:
+      label: Operating System & Tools
+      description: OS version, mpv version (`mpv --version`), yt-dlp version (`yt-dlp --version`).
+      placeholder: "Linux / macOS / Windows, mpv 0.38, yt-dlp 2024.08.06"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output or Errors
+      description: Please copy and paste any notifications, `:messages` output, or terminal errors.
+      render: text
