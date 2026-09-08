@@ -71,17 +71,20 @@ function M.get_statusline()
 	local speed = (state.speed and state.speed ~= 1) and string.format("%.2gx", state.speed) or ""
 	local radio_tag = state.radio_enabled and "📻" or ""
 
-	local result = M.config.format
-		:gsub("{icon}", escape_gsub(icon))
-		:gsub("{title}", escape_gsub(title))
-		:gsub("{artist}", escape_gsub(state.artist or ""))
-		:gsub("{album}", escape_gsub(state.album or ""))
-		:gsub("{position}", escape_gsub(utils.format_time(state.position)))
-		:gsub("{duration}", escape_gsub(utils.format_time(state.duration)))
-		:gsub("{volume}", escape_gsub(tostring(math.floor(state.volume or 100))))
-		:gsub("{progress}", escape_gsub(progress_bar(state.position, state.duration, M.config.progress_width)))
-		:gsub("{speed}", escape_gsub(speed))
-		:gsub("{radio}", escape_gsub(radio_tag))
+	local tokens = {
+		icon = icon,
+		title = title,
+		artist = state.artist or "",
+		album = state.album or "",
+		position = utils.format_time(state.position),
+		duration = utils.format_time(state.duration),
+		volume = tostring(math.floor(state.volume or 100)),
+		progress = progress_bar(state.position, state.duration, M.config.progress_width),
+		speed = speed,
+		radio = radio_tag,
+	}
+
+	local result = M.config.format:gsub("{([%w_]+)}", tokens)
 
 	cached_line = result
 	cached_hash = h

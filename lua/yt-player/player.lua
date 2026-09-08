@@ -1,6 +1,8 @@
 ---@mod yt-player.player Player UI windows
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 M.panel = { win_id = nil, buf_id = nil, update_timer = nil }
 M.float = { win_id = nil, buf_id = nil, update_timer = nil }
 
@@ -394,8 +396,8 @@ local function build_lines(state, is_float)
 				table.insert(highlights, { line = line_idx, hl = "YtPlayerVolumeBg", col_start = gauge_start + filled_bytes, col_end = gauge_start + filled_bytes + unfilled_bytes })
 			end
 
-			-- Suffix (%d%%   ⚡ %s) starts at gauge_start + 30
-			local suffix_start = gauge_start + 30
+			-- Suffix (%d%%   ⚡ %s) starts at gauge_start + 30 + 1 (accounts for space)
+			local suffix_start = gauge_start + 30 + 1
 			table.insert(highlights, { line = line_idx, hl = "YtPlayerVolume", col_start = suffix_start, col_end = 4 + #padded })
 
 			-- Right border
@@ -713,7 +715,7 @@ function M.open_panel()
 
 	setup_keymaps(M.panel.buf_id, false)
 
-	M.panel.update_timer = (vim.uv or vim.loop).new_timer()
+	M.panel.update_timer = uv.new_timer()
 	M.panel.update_timer:start(
 		200,
 		200,
@@ -813,7 +815,7 @@ function M.open_float()
 
 	setup_keymaps(M.float.buf_id, true)
 
-	M.float.update_timer = (vim.uv or vim.loop).new_timer()
+	M.float.update_timer = uv.new_timer()
 	M.float.update_timer:start(
 		1000,
 		1000,

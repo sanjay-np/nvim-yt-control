@@ -265,10 +265,24 @@ function M._register()
 			desc = "Manage local playlists",
 		},
 		radio = {
-			impl = function()
-				require("yt-player.radio").toggle()
+			impl = function(args)
+				args = vim.trim(args or ""):lower()
+				local state = require("yt-player.state").get_current()
+				local radio = require("yt-player.radio")
+				if args == "on" then
+					if not state.radio_enabled then
+						radio.toggle()
+					end
+				elseif args == "off" then
+					if state.radio_enabled then
+						radio.toggle()
+					end
+				else
+					radio.toggle()
+				end
 			end,
-			desc = "Toggle autoplay radio mode",
+			desc = "Toggle autoplay radio mode (toggle | on | off)",
+			nargs = "?",
 		},
 		resume = {
 			impl = function()
@@ -307,11 +321,56 @@ function M._register()
 		desc = "YT Control Master Command",
 		nargs = "*",
 		complete = function(ArgLead, CmdLine, CursorPos)
-			-- Simple autocomplete for subcommands
+			local before = CmdLine:sub(1, CursorPos):gsub("^%s+", "")
+			local parts = {}
+			for part in before:gmatch("%S+") do
+				table.insert(parts, part)
+			end
+			local trailing_space = before:match("%s$") ~= nil
+			local arg_idx = #parts + (trailing_space and 1 or 0)
+
+			-- If completing the subcommand name (arg_idx <= 2)
+			if arg_idx <= 2 then
+				local matches = {}
+				for name, _ in pairs(subcommands) do
+					if name:lower():match("^" .. ArgLead:lower()) then
+						table.insert(matches, name)
+					end
+				end
+				table.sort(matches)
+				return matches
+			end
+
+			-- Completing secondary arguments for a subcommand
+			local subcmd_name = parts[2]
+			local candidates = {}
+
+			if subcmd_name == "speed" then
+				candidates = { "up", "down", "0.5", "0.75", "1.0", "1.25", "1.5", "1.75", "2.0" }
+			elseif subcmd_name == "radio" then
+				candidates = { "toggle", "on", "off" }
+			elseif subcmd_name == "volume" then
+				candidates = { "0", "25", "50", "75", "100" }
+			elseif subcmd_name == "seek_rel" then
+				candidates = { "+5", "-5", "+10", "-10", "+30", "-30", "+60", "-60" }
+			elseif subcmd_name == "seek" then
+				candidates = { "0", "30", "60", "120", "300" }
+			elseif subcmd_name == "history" then
+				candidates = { "clear" }
+			elseif subcmd_name == "playlists" then
+				local ok, pl_mod = pcall(require, "yt-player.playlists")
+				if ok and pl_mod.get_all then
+					local lists = pl_mod.get_all()
+					for name, _ in pairs(lists) do
+						table.insert(candidates, name)
+					end
+				end
+			end
+
 			local matches = {}
-			for name, _ in pairs(subcommands) do
-				if name:lower():match("^" .. ArgLead:lower()) then
-					table.insert(matches, name)
+			for _, item in ipairs(candidates) do
+				if item:lower():match("^" .. ArgLead:lower()) then
+					table.insert(matches, item)
 				end
 			end
 			table.sort(matches)

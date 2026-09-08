@@ -45,23 +45,38 @@ end
 ---@param max_width number
 ---@return string
 function M.safe_truncate(str, max_width)
-	if not str then
+	if not str or str == "" or not max_width or max_width <= 0 then
 		return ""
 	end
 	-- Strip control characters that would break nvim_buf_set_lines
 	str = str:gsub("[\n\r\t]", " ")
-	local width = vim.fn.strdisplaywidth(str)
-	if width <= max_width then
+	if vim.fn.strdisplaywidth(str) <= max_width then
 		return str
 	end
 
-	local chars = vim.fn.strchars(str)
-	local truncated = str
-	while vim.fn.strdisplaywidth(truncated) > max_width - 3 and chars > 0 do
-		chars = chars - 1
-		truncated = vim.fn.strcharpart(str, 0, chars)
+	if max_width <= 3 then
+		local sub = vim.fn.strcharpart(str, 0, max_width)
+		while vim.fn.strdisplaywidth(sub) > max_width and max_width > 0 do
+			max_width = max_width - 1
+			sub = vim.fn.strcharpart(str, 0, max_width)
+		end
+		return sub
 	end
-	return truncated .. "..."
+
+	local target = max_width - 3
+	local low, high = 1, vim.fn.strchars(str)
+	local best = 0
+	while low <= high do
+		local mid = math.floor((low + high) / 2)
+		local sub = vim.fn.strcharpart(str, 0, mid)
+		if vim.fn.strdisplaywidth(sub) <= target then
+			best = mid
+			low = mid + 1
+		else
+			high = mid - 1
+		end
+	end
+	return vim.fn.strcharpart(str, 0, best) .. "..."
 end
 
 ---Right-pad `str` with spaces until it reaches `target_width` display columns.
@@ -90,6 +105,18 @@ function M.sanitize_url(url)
 	-- Trim whitespace
 	url = url:match("^%s*(.-)%s*$") or url
 	return url
+end
+
+---Ensure the parent directory of a file path exists
+---@param filepath string
+function M.ensure_dir(filepath)
+	if not filepath or filepath == "" then
+		return
+	end
+	local dir = vim.fn.fnamemodify(filepath, ":h")
+	if vim.fn.isdirectory(dir) == 0 then
+		vim.fn.mkdir(dir, "p")
+	end
 end
 
 return M

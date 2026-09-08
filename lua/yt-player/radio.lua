@@ -1,8 +1,13 @@
 ---@mod yt-player.radio YouTube Autoplay Radio Engine
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 M.is_fetching = false
 M.active_handle = nil
+M.last_failed_video_id = nil
+M.last_failed_time = 0
+M.cooldown_seconds = 60
 
 --- Cancel any active recommendation fetch job
 function M.cancel()
@@ -15,6 +20,8 @@ function M.cancel()
 		end)
 		M.active_handle = nil
 	end
+	M.last_failed_video_id = nil
+	M.last_failed_time = 0
 	local state_mod = require("yt-player.state")
 	local state = state_mod.get_current()
 	state.radio_fetching = false
@@ -27,6 +34,8 @@ function M.toggle()
 	state.radio_enabled = not state.radio_enabled
 
 	if state.radio_enabled then
+		M.last_failed_video_id = nil
+		M.last_failed_time = 0
 		vim.notify("YT Control: 📻 Autoplay Radio: ON", vim.log.levels.INFO)
 		M.check_and_trigger()
 	else
@@ -81,11 +90,11 @@ function M.get_related_tracks(video_id, limit, callback)
 		mix_url,
 	}
 
-	local stdout = vim.loop.new_pipe(false)
+	local stdout = uv.new_pipe(false)
 	local results = {}
 
 	local handle
-	handle = vim.loop.spawn(args[1], {
+	handle = uv.spawn(args[1], {
 		args = vim.list_slice(args, 2),
 		stdio = { nil, stdout, nil },
 	}, function(code)
@@ -203,6 +212,11 @@ function M.check_and_trigger()
 		return
 	end
 
+	local now = os.time()
+	if M.last_failed_video_id == video_id and (now - M.last_failed_time) < (M.cooldown_seconds or 60) then
+		return
+	end
+
 	state.radio_fetching = true
 
 	local limit = 5
@@ -223,11 +237,15 @@ function M.check_and_trigger()
 		end
 
 		if err then
+			M.last_failed_video_id = video_id
+			M.last_failed_time = os.time()
 			vim.notify("YT Radio: Error - " .. err, vim.log.levels.WARN)
 			return
 		end
 
 		if #tracks == 0 then
+			M.last_failed_video_id = video_id
+			M.last_failed_time = os.time()
 			return
 		end
 
@@ -269,7 +287,13 @@ function M.check_and_trigger()
 		end
 
 		if added_count > 0 then
+			M.last_failed_video_id = nil
+			M.last_failed_time = 0
 			vim.notify(string.format("YT Radio: Queued %d recommended track(s)", added_count), vim.log.levels.INFO)
+		else
+			-- No new unique tracks were found to add; record failure cooldown to prevent loop
+			M.last_failed_video_id = video_id
+			M.last_failed_time = os.time()
 		end
 	end)
 end

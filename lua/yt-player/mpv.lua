@@ -1,6 +1,6 @@
 local M = {}
 
-local uv = vim.loop
+local uv = vim.uv or vim.loop
 local state_mod = require("yt-player.state")
 local yt_utils = require("yt-player.utils")
 
@@ -416,6 +416,7 @@ function M._process_ipc_buffer()
 		ipc_buffer = ipc_buffer:sub(-(IPC_BUFFER_MAX / 2))
 	end
 
+	local lines_batch = {}
 	local pos = 1
 	while true do
 		local newline_pos = ipc_buffer:find("\n", pos)
@@ -427,17 +428,26 @@ function M._process_ipc_buffer()
 		pos = newline_pos + 1
 
 		if line ~= "" then
-			vim.schedule(function()
-				if M.shutting_down then
-					return
-				end
-				M._handle_ipc_message(line)
-			end)
+			lines_batch[#lines_batch + 1] = line
 		end
 	end
 
 	if pos > 1 then
 		ipc_buffer = ipc_buffer:sub(pos)
+	end
+
+	if #lines_batch > 0 then
+		vim.schedule(function()
+			if M.shutting_down then
+				return
+			end
+			for _, line in ipairs(lines_batch) do
+				if M.shutting_down then
+					return
+				end
+				M._handle_ipc_message(line)
+			end
+		end)
 	end
 end
 
@@ -619,16 +629,6 @@ function M.shutdown()
 		end
 		M._cleanup_ipc()
 
-		-- Safer fallback: use socket filename in pattern to reduce false matches
-		-- (prefer jobstop via recorded job id when possible)
-		local socket_name = vim.fn.fnamemodify(M.ipc_socket_path, ":t")
-		vim.fn.jobstart({ "pkill", "-f", "mpv.*" .. socket_name })
-
-		-- Clean up socket file
-		pcall(function()
-			os.remove(M.ipc_socket_path)
-		end)
-
 		if M.mpv_job_id ~= nil then
 			local id = M.mpv_job_id
 			M.mpv_job_id = nil
@@ -636,6 +636,11 @@ function M.shutdown()
 				vim.fn.jobstop(id)
 			end)
 		end
+
+		-- Clean up socket file
+		pcall(function()
+			os.remove(M.ipc_socket_path)
+		end)
 	else
 		M._cleanup_ipc()
 	end

@@ -28,7 +28,9 @@ end
 
 --- Write playlists to disk
 local function save(data)
-	local f = io.open(get_path(), "w")
+	local path = get_path()
+	utils.ensure_dir(path)
+	local f = io.open(path, "w")
 	if f then
 		f:write(vim.json.encode(data))
 		f:close()
@@ -176,6 +178,8 @@ function M.open_manager()
 
 	vim.wo[left_win].cursorline = true
 	vim.wo[right_win].cursorline = true
+	vim.bo[left_buf].bufhidden = "wipe"
+	vim.bo[right_buf].bufhidden = "wipe"
 
 	-- Setup highlights
 	local ns = vim.api.nvim_create_namespace("yt_playlists")

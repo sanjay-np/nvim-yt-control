@@ -1,6 +1,8 @@
 ---@mod yt-player.session Persistent session save and auto-resume
 local M = {}
 
+local utils = require("yt-player.utils")
+
 local function session_path()
 	return vim.fn.stdpath("data") .. "/yt-player-session.json"
 end
@@ -35,7 +37,9 @@ function M.save()
 		artist_map = state.artist_map or {},
 	}
 
-	local f = io.open(session_path(), "w")
+	local path = session_path()
+	utils.ensure_dir(path)
+	local f = io.open(path, "w")
 	if f then
 		f:write(vim.json.encode(data))
 		f:close()

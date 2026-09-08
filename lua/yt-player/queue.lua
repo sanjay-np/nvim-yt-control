@@ -1,6 +1,7 @@
 ---@mod yt-player.queue Interactive Queue Management
 local M = {}
 
+local uv = vim.uv or vim.loop
 local state_mod = require("yt-player.state")
 local mpv = require("yt-player.mpv")
 local utils = require("yt-player.utils")
@@ -90,17 +91,30 @@ function M.open()
 
 	vim.wo[M.win_id].cursorline = true
 	vim.bo[M.buf_id].filetype = "yt-player-queue"
+	vim.bo[M.buf_id].bufhidden = "wipe"
 
 	render_queue()
 
 	local opts = { buffer = M.buf_id, silent = true }
 
 	local function get_idx()
+		if not M.win_id or not vim.api.nvim_win_is_valid(M.win_id) then
+			return nil
+		end
+		local state = state_mod.get_current()
+		local plist = state.playlist or {}
+		if #plist == 0 then
+			return nil
+		end
 		local r = vim.api.nvim_win_get_cursor(M.win_id)[1]
 		if r <= 4 then
 			return nil
 		end
-		return r - 5 -- 0-indexed for mpv
+		local idx = r - 5 -- 0-indexed for mpv
+		if idx < 0 or idx >= #plist then
+			return nil
+		end
+		return idx
 	end
 
 	local function refresh()
@@ -169,7 +183,7 @@ function M.open()
 
 	-- Auto-refresh on state change isn't strictly needed if we refresh on action,
 	-- but an autocmd or simple timer ensures playing pointer stays accurate.
-	local timer = vim.loop.new_timer()
+	local timer = uv.new_timer()
 	timer:start(
 		1000,
 		1000,

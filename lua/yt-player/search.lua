@@ -1,6 +1,7 @@
 ---@mod yt-player.search YouTube search via yt-dlp
 local M = {}
 
+local uv = vim.uv or vim.loop
 local utils = require("yt-player.utils")
 
 -- =============================================================================
@@ -124,11 +125,11 @@ function M.search(query, count, offset, callback)
 	local stderr_chunks = {}
 	local results = {}
 
-	local stdout = vim.loop.new_pipe(false)
-	local stderr = vim.loop.new_pipe(false)
+	local stdout = uv.new_pipe(false)
+	local stderr = uv.new_pipe(false)
 
 	local handle
-	handle = vim.loop.spawn(args[1], {
+	handle = uv.spawn(args[1], {
 		args = vim.list_slice(args, 2),
 		stdio = { nil, stdout, stderr },
 	}, function(code)
@@ -253,10 +254,10 @@ function M.fetch_playlist(url)
 		url,
 	}
 
-	local stdout = vim.loop.new_pipe(false)
+	local stdout = uv.new_pipe(false)
 	local handle
 
-	handle = vim.loop.spawn(args[1], {
+	handle = uv.spawn(args[1], {
 		args = vim.list_slice(args, 2),
 		stdio = { nil, stdout, nil },
 	}, function(code)
@@ -292,7 +293,7 @@ function M.fetch_playlist(url)
 
 	local partial = ""
 	local buffer_items = {}
-	local processing_timer = (vim.uv or vim.loop).new_timer()
+	local processing_timer = uv.new_timer()
 
 	processing_timer:start(
 		500,
@@ -388,6 +389,7 @@ function M.interactive_picker(initial_query)
 
 	-- Create buffer
 	local buf = vim.api.nvim_create_buf(false, true)
+	vim.bo[buf].bufhidden = "wipe"
 
 	-- Open window
 	local win = vim.api.nvim_open_win(buf, true, {
@@ -884,6 +886,8 @@ function M.interactive_picker(initial_query)
 		if #results == 0 then
 			return
 		end
+		local old_idx = selected_idx
+		local old_scroll = scroll_offset
 		selected_idx = math.max(1, math.min(#results, idx))
 		local max_visible = math.floor(results_height / LINES_PER_RESULT)
 		if selected_idx > scroll_offset + max_visible then
@@ -891,85 +895,104 @@ function M.interactive_picker(initial_query)
 		elseif selected_idx <= scroll_offset then
 			scroll_offset = selected_idx - 1
 		end
-		render_results()
+		if old_scroll ~= scroll_offset then
+			render_results()
+		elseif old_idx ~= selected_idx then
+			update_selection(old_idx, selected_idx)
+		end
 		local target_line = HEADER_LINES + 1 + (selected_idx - scroll_offset - 1) * LINES_PER_RESULT
 		vim.api.nvim_win_set_cursor(win, { target_line, 0 })
 	end
 
-	-- Lightweight highlight update for selection changes only
-	local function update_selection_highlights()
+	-- Lightweight highlight and accent update for single row
+	local function render_row_highlights(idx)
 		if not vim.api.nvim_buf_is_valid(buf) then
 			return
 		end
+		local max_visible = math.floor(results_height / LINES_PER_RESULT)
+		local start_idx = scroll_offset + 1
+		local end_idx = math.min(#results, scroll_offset + max_visible)
+		if idx < start_idx or idx > end_idx then
+			return
+		end
 
-		-- Clear old selection highlights (lines 2 onward)
-		vim.api.nvim_buf_clear_namespace(buf, ns, 2, -1)
+		local r = results[idx]
+		if not r then
+			return
+		end
 
-		-- Reapply highlights for all results
-		for i, r in ipairs(results) do
-			local title_ln = 2 + (i - 1) * LINES_PER_RESULT
-			local meta_ln = title_ln + 1
-			local sep_ln = title_ln + 2
-			local is_selected = (i == selected_idx)
-			local is_playing = (r.url == current_playing_url)
+		local display_idx = idx - scroll_offset
+		local title_ln = HEADER_LINES + (display_idx - 1) * LINES_PER_RESULT
+		local meta_ln = title_ln + 1
 
-			local accent_byte_len = (is_playing or is_selected) and 4 or 2
+		local is_selected = (idx == selected_idx)
+		local is_playing = (r.url == current_playing_url)
+		local new_accent = is_playing and " ♫" or (is_selected and " ❯" or "  ")
 
-			if is_playing then
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlaying", title_ln, 0, accent_byte_len)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlayingTitle", title_ln, accent_byte_len, -1)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlayingMeta", meta_ln, 0, -1)
-			elseif is_selected then
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchAccent", title_ln, 0, accent_byte_len)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchSelectedTitle", title_ln, accent_byte_len, -1)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchAccent", meta_ln, 0, accent_byte_len)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchSelectedMeta", meta_ln, 0, -1)
+		local lines = vim.api.nvim_buf_get_lines(buf, title_ln, title_ln + 1, false)
+		local line_text = lines[1] or ""
+		local old_accent_len = (line_text:sub(1, 4) == " ♫" or line_text:sub(1, 4) == " ❯") and 4 or 2
 
-				-- Duration highlight
-				local lines = vim.api.nvim_buf_get_lines(buf, meta_ln, meta_ln + 1, false)
-				local meta_content = lines[1] or ""
-				local dur = fmt_duration(r.duration)
-				if dur ~= "" then
-					local dur_byte_start = meta_content:find(dur, 1, true)
-					if dur_byte_start then
-						vim.api.nvim_buf_add_highlight(
-							buf,
-							ns,
-							"YTSearchSelectedDur",
-							meta_ln,
-							dur_byte_start - 1,
-							dur_byte_start - 1 + #dur
-						)
-					end
-				end
-			else
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchIndex", title_ln, 0, accent_byte_len + 5)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchTitle", title_ln, accent_byte_len + 5, -1)
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchChannel", meta_ln, 0, -1)
+		vim.bo[buf].modifiable = true
+		pcall(vim.api.nvim_buf_set_text, buf, title_ln, 0, title_ln, old_accent_len, { new_accent })
+		vim.bo[buf].modifiable = false
 
-				-- Duration highlight
-				local lines = vim.api.nvim_buf_get_lines(buf, meta_ln, meta_ln + 1, false)
-				local meta_content = lines[1] or ""
-				local dur = fmt_duration(r.duration)
-				if dur ~= "" then
-					local dur_byte_start = meta_content:find(dur, 1, true)
-					if dur_byte_start then
-						vim.api.nvim_buf_add_highlight(
-							buf,
-							ns,
-							"YTSearchDuration",
-							meta_ln,
-							dur_byte_start - 1,
-							dur_byte_start - 1 + #dur
-						)
-					end
+		vim.api.nvim_buf_clear_namespace(buf, ns, title_ln, meta_ln + 1)
+
+		local accent_byte_len = (is_playing or is_selected) and 4 or 2
+		if is_playing then
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlaying", title_ln, 0, accent_byte_len)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlayingTitle", title_ln, accent_byte_len, -1)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchPlayingMeta", meta_ln, 0, -1)
+		elseif is_selected then
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchAccent", title_ln, 0, accent_byte_len)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchSelectedTitle", title_ln, accent_byte_len, -1)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchAccent", meta_ln, 0, accent_byte_len)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchSelectedMeta", meta_ln, 0, -1)
+
+			local meta_lines = vim.api.nvim_buf_get_lines(buf, meta_ln, meta_ln + 1, false)
+			local meta_content = meta_lines[1] or ""
+			local dur = fmt_duration(r.duration)
+			if dur ~= "" then
+				local dur_byte_start = meta_content:find(dur, 1, true)
+				if dur_byte_start then
+					vim.api.nvim_buf_add_highlight(
+						buf,
+						ns,
+						"YTSearchSelectedDur",
+						meta_ln,
+						dur_byte_start - 1,
+						dur_byte_start - 1 + #dur
+					)
 				end
 			end
+		else
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchIndex", title_ln, 0, accent_byte_len + 5)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchTitle", title_ln, accent_byte_len + 5, -1)
+			vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchChannel", meta_ln, 0, -1)
 
-			if i < #results then
-				vim.api.nvim_buf_add_highlight(buf, ns, "YTSearchSeparator", sep_ln, 0, -1)
+			local meta_lines = vim.api.nvim_buf_get_lines(buf, meta_ln, meta_ln + 1, false)
+			local meta_content = meta_lines[1] or ""
+			local dur = fmt_duration(r.duration)
+			if dur ~= "" then
+				local dur_byte_start = meta_content:find(dur, 1, true)
+				if dur_byte_start then
+					vim.api.nvim_buf_add_highlight(
+						buf,
+						ns,
+						"YTSearchDuration",
+						meta_ln,
+						dur_byte_start - 1,
+						dur_byte_start - 1 + #dur
+					)
+				end
 			end
 		end
+	end
+
+	local function update_selection(old_idx, new_idx)
+		render_row_highlights(old_idx)
+		render_row_highlights(new_idx)
 	end
 
 	-- Navigation - through all results
@@ -982,6 +1005,7 @@ function M.interactive_picker(initial_query)
 		end
 
 		local old_idx = selected_idx
+		local old_scroll = scroll_offset
 		selected_idx = math.max(1, math.min(#results, selected_idx + dir))
 
 		local max_visible = math.floor(results_height / LINES_PER_RESULT)
@@ -992,7 +1016,11 @@ function M.interactive_picker(initial_query)
 		end
 
 		if old_idx ~= selected_idx then
-			render_results()
+			if old_scroll ~= scroll_offset then
+				render_results()
+			else
+				update_selection(old_idx, selected_idx)
+			end
 			local target_line = HEADER_LINES + 1 + (selected_idx - scroll_offset - 1) * LINES_PER_RESULT
 			vim.api.nvim_win_set_cursor(win, { target_line, 0 })
 		end

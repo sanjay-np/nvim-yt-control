@@ -31,7 +31,9 @@ end
 --- Write history to disk
 ---@param data table[]
 local function save(data)
-	local f = io.open(history_path(), "w")
+	local path = history_path()
+	utils.ensure_dir(path)
+	local f = io.open(path, "w")
 	if f then
 		f:write(vim.json.encode(data))
 		f:close()

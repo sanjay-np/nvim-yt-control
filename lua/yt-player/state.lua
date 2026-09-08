@@ -1,6 +1,8 @@
 ---@mod yt-player.state Centralized playback state
 local M = {}
 
+local uv = vim.uv or vim.loop
+
 M.config = {}
 
 M.current = {
@@ -53,7 +55,7 @@ function M.update(data)
 		end)
 	end
 
-	local now = vim.loop.now()
+	local now = uv.now()
 	if now - last_redraw > 200 then
 		last_redraw = now
 		pcall(vim.cmd, "redrawstatus!")
